@@ -4,6 +4,8 @@ import numpy as np
 from skimage import io
 from pathlib import Path
 
+from functions import get_patches
+
 #%% Inputs --------------------------------------------------------------------
 
 # Path
@@ -13,7 +15,7 @@ loc_path = Path("D:/local_Gassler/data")
 
 C1_paths = list(loc_path.glob("*C1_R02_005*.tif"))
 
-#%%
+#%% Preprocessing -------------------------------------------------------------
 
 for C1_path in C1_paths:
     
@@ -29,11 +31,12 @@ for C1_path in C1_paths:
     pMax = np.percentile(C1_min, 99.9)
     C1_min[C1_min > pMax] = pMax
     C1_min = (C1_min / pMax).astype(float)
+    
+# import napari
+# viewer = napari.Viewer()
+# viewer.add_image(C1_min)
             
 #%%
 
-import napari
-viewer = napari.Viewer()
-viewer.add_image(C1_min)
             
     

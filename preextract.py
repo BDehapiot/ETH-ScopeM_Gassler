@@ -18,8 +18,8 @@ from skimage.transform import downscale_local_mean
 #%% Inputs --------------------------------------------------------------------
 
 # Path
-loc_path  = Path("D:/local_Gassler/data")
-net_path  = Path(r"\\scopem-userdata.ethz.ch\Image-Clinic\20240131_Burst_Rate_24TG02")
+loc_path   = Path("D:/local_Gassler/data")
+net_path   = Path(r"\\scopem-userdata.ethz.ch\Image-Clinic\20240131_Burst_Rate_24TG02")
 nd2_paths = list(net_path.glob("**/*.nd2"))
 nd2_paths[0:2] = [] # Remove merged .nd2 files
 
@@ -32,7 +32,7 @@ stems = sorted(set(stems))
 # Parameters
 downscale_factor = 4
 
-#%% Extract -------------------------------------------------------------------
+#%% Extract stacks ------------------------------------------------------------
 
 for stem in stems:
     
@@ -41,7 +41,7 @@ for stem in stems:
     C1_path = Path(loc_path, f"C1_{exp_name}_{exp_numb}.tif")
     C2_path = Path(loc_path, f"C2_{exp_name}_{exp_numb}.tif")
     
-    if not C1_path.exists(): 
+    if not C1_path.exists():
     
         C1, C2 = [], []
         for path in paths:
