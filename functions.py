@@ -1,10 +1,44 @@
 #%% Imports -------------------------------------------------------------------
 
 import numpy as np
+from joblib import Parallel, delayed 
+from skimage.morphology import skeletonize
 
 #%% Functions -----------------------------------------------------------------
 
+def preprocess(hstack):
+    
+    # Convert to float32
+    hstack = hstack.astype("float32")
+    
+    # Mean normalization
+    for z in range(hstack.shape[1]):
+        for t in range(hstack.shape[0]):
+            hstack[t,z,...] /= np.mean(hstack[t,z,...])
+            
+    # Min. projection & 0 to 1 normalization
+    hstack_min = np.min(hstack, axis=1)        
+    pMax = np.percentile(hstack_min, 99.9)
+    hstack_min[hstack_min > pMax] = pMax
+    hstack_min = (hstack_min / pMax).astype("float32")
+    
+    return hstack_min
 
+# -----------------------------------------------------------------------------
+
+def get_skel(msk):
+    
+    labels = np.unique(msk)[1:]
+    skel = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
+    for l, label in enumerate(labels):
+        tmp = msk == label
+        tmp = skeletonize(tmp, method="lee")
+        skel[l,...] = tmp
+    skel = np.max(skel, axis=0)
+    
+    return skel
+
+# def get_edm(msk)
 
 # -----------------------------------------------------------------------------
 
@@ -45,4 +79,51 @@ def get_patches(arr, size, overlap):
                     patches.append(arr_pad[t, y0:y0 + size, x0:x0 + size])
             
     return patches
+
+# -----------------------------------------------------------------------------
+
+def merge_patches(patches, shape, size, overlap):
+    
+    # Get dimensions 
+    if len(shape) == 2: nT = 1; nY, nX = shape
+    if len(shape) == 3: nT, nY, nX = shape
+    nPatch = len(patches) // nT
+
+    # Get variables
+    y0s = np.arange(0, nY, size - overlap)
+    x0s = np.arange(0, nX, size - overlap)
+    yMax = y0s[-1] + size
+    xMax = x0s[-1] + size
+    yPad = yMax - nY
+    xPad = xMax - nX
+    yPad1 = yPad // 2
+    xPad1 = xPad // 2
+
+    # Merge patches
+    def _merge_patches(patches):
+        count = 0
+        arr = np.full((2, nY + yPad, nX + xPad), np.nan)
+        for i, y0 in enumerate(y0s):
+            for j, x0 in enumerate(x0s):
+                if i % 2 == j % 2:
+                    arr[0, y0:y0 + size, x0:x0 + size] = patches[count]
+                else:
+                    arr[1, y0:y0 + size, x0:x0 + size] = patches[count]
+                count += 1 
+        arr = np.nanmean(arr, axis=0)
+        arr = arr[yPad1:yPad1 + nY, xPad1:xPad1 + nX]
+        return arr
+        
+    if len(shape) == 2:
+        arr = _merge_patches(patches)
+
+    if len(shape) == 3:
+        patches = np.stack(patches).reshape(nT, nPatch, size, size)
+        arr = Parallel(n_jobs=-1)(
+            delayed(_merge_patches)(patches[t,...])
+            for t in range(nT)
+            )
+        arr = np.stack(arr)
+        
+    return arr
  

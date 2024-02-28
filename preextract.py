@@ -18,8 +18,8 @@ from skimage.transform import downscale_local_mean
 #%% Inputs --------------------------------------------------------------------
 
 # Path
-loc_path   = Path("D:/local_Gassler/data")
-net_path   = Path(r"\\scopem-userdata.ethz.ch\Image-Clinic\20240131_Burst_Rate_24TG02")
+loc_path  = Path("D:/local_Gassler/data")
+net_path  = Path(r"\\scopem-userdata.ethz.ch\Image-Clinic\20240131_Burst_Rate_24TG02")
 nd2_paths = list(net_path.glob("**/*.nd2"))
 nd2_paths[0:2] = [] # Remove merged .nd2 files
 

@@ -1,11 +1,11 @@
 #%% Imports -------------------------------------------------------------------
 
-import nd2
-import time
 import numpy as np
 from skimage import io
 from pathlib import Path
-from skimage.transform import downscale_local_mean
+
+# Functions
+from functions import preprocess
 
 #%% Comments ------------------------------------------------------------------
 
@@ -32,19 +32,10 @@ downscale_factor = 4
 
 for C1_path in C1_paths:
     
-    C1 = io.imread(C1_path).astype("float32")
-    
-    # Mean normalization
-    for z in range(C1.shape[1]):
-        for t in range(C1.shape[0]):
-            C1[t,z,...] /= np.mean(C1[t,z,...])
-            
-    # Min. projection & 0 to 1 normalization
-    C1_min = np.min(C1, axis=1)        
-    pMax = np.percentile(C1_min, 99.9)
-    C1_min[C1_min > pMax] = pMax
-    C1_min = (C1_min / pMax).astype(float)
-    
+    # Open and preprocess
+    C1 = io.imread(C1_path)
+    C1_min = preprocess(C1)
+        
     # Select random frames
     rIdxs = np.random.randint(0, C1.shape[0] // 2, size=nFrame)
     for idx in rIdxs:        
