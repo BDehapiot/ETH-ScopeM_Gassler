@@ -39,24 +39,36 @@ imgs = np.stack(imgs)
         
 #%%
 
-from skimage.morphology import skeletonize
+from skimage.filters import gaussian
+from skimage.morphology import skeletonize, binary_erosion
 from scipy.ndimage import distance_transform_edt
 
 msk = msks[9]
-
 labels = np.unique(msk)[1:]
-edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
+borders = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
 for l, label in enumerate(labels):
     tmp = msk == label
-    tmp = distance_transform_edt(tmp)
-    pMax = np.percentile(tmp, 99.9)
-    # tmp[tmp > pMax] = pMax
-    # tmp = (tmp / pMax).astype("float32")
-    edm[l,...] = tmp
-edm = np.max(edm, axis=0)  
+    tmp = tmp ^ binary_erosion(tmp)
+    # tmp = gaussian(tmp.astype("float32"), sigma=2)
+    borders[l,...] = tmp
+borders = np.max(borders, axis=0)
+
+# labels = np.unique(msk)[1:]
+# edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
+# for l, label in enumerate(labels):
+#     tmp = msk == label
+#     tmp = distance_transform_edt(tmp)
+#     pMax = np.percentile(tmp[tmp > 0], 99.9)
+#     tmp[tmp > pMax] = pMax
+#     tmp = (tmp / pMax).astype("float32")
+#     edm[l,...] = tmp
+# edm = np.max(edm, axis=0)  
+# return edm
+
+
     
 # Display 
 viewer = napari.Viewer()
-viewer.add_image(msk)
-viewer.add_image(edm)
+viewer.add_labels(msk)
+viewer.add_image(borders)
         

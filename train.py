@@ -14,7 +14,7 @@ from joblib import Parallel, delayed
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # Functions
-from functions import get_skel, get_patches
+from functions import get_bodies, get_outlines, get_patches
 
 #%% Inputs --------------------------------------------------------------------
 
@@ -24,11 +24,14 @@ train_path = Path(Path.cwd(), 'data', 'train')
 # Patches
 downscale_factor = 4
 size = 512 // downscale_factor
-overlap = size // 8
+overlap = size // 4
+
+# Mask type
+mask_type = "bodies" # "bodies" or "outlines"
 
 # Data augmentation
 random.seed(42)
-iterations = 1000
+iterations = 2000
 
 # Train model
 validation_split = 0.2
@@ -37,73 +40,68 @@ batch_size = 16
 
 #%% Pre-processing ------------------------------------------------------------
 
-img_patches, msk_patches, skl_patches = [], [], []
+img_patches, msk_patches = [], []
 for path in train_path.iterdir():
     if 'mask' in path.name:
         
         # Open data
         msk = io.imread(path)
         img = io.imread(str(path).replace('_mask', ''))
-        
-        # Get skeleton
-        skl = get_skel(msk).astype("float32")
-        msk = (msk > 0).astype("float32")
                 
+        # Convert masks
+        if mask_type == "bodies":
+            msk = get_bodies(msk)
+        if mask_type == "outlines":
+            msk = get_outlines(msk)
+                        
         # Extract patches
         img_patches.append(get_patches(img, size, overlap))
         msk_patches.append(get_patches(msk, size, overlap))
-        skl_patches.append(get_patches(skl, size, overlap))
 
 img_patches = np.stack([patch for patches in img_patches for patch in patches])
 msk_patches = np.stack([patch for patches in msk_patches for patch in patches])
-skl_patches = np.stack([patch for patches in skl_patches for patch in patches])
 
-# Display 
-viewer = napari.Viewer()
-viewer.add_image(img_patches)
-viewer.add_image(msk_patches) 
-viewer.add_image(skl_patches) 
+# # Display 
+# viewer = napari.Viewer()
+# viewer.add_image(img_patches)
+# viewer.add_image(msk_patches) 
             
 #%% Augmentation --------------------------------------------------------------
 
-# augment = True if iterations > 0 else False
+augment = True if iterations > 0 else False
 
-# if augment:
+if augment:
     
-#     # Define augmentation operations
-#     operations = A.Compose([
-#         A.VerticalFlip(p=0.5),              
-#         A.RandomRotate90(p=0.5),
-#         A.HorizontalFlip(p=0.5),
-#         A.Transpose(p=0.5),
-#         A.GridDistortion(p=0.5),
-#         ], additional_targets={'mask2': 'mask'}
-#         )
+    # Define augmentation operations
+    operations = A.Compose([
+        A.VerticalFlip(p=0.5),              
+        A.RandomRotate90(p=0.5),
+        A.HorizontalFlip(p=0.5),
+        A.Transpose(p=0.5),
+        A.GridDistortion(p=0.5),
+        ])
 
-#     # Augment data
-#     def augment_data(images, masks1, masks2, operations):      
-#         idx = random.randint(0, len(images) - 1)
-#         outputs = operations(
-#             image=images[idx,...], 
-#             mask=masks1[idx,...], 
-#             mask2=masks2[idx,...]
-#             )
-#         return outputs['image'], outputs['mask'], outputs['mask2']
+    # Augment data
+    def augment_data(images, masks, operations):      
+        idx = random.randint(0, len(images) - 1)
+        outputs = operations(
+            image=images[idx,...], 
+            mask=masks[idx,...], 
+            )
+        return outputs['image'], outputs['mask']
     
-#     # Execute parallel augmentation for each iteration
-#     outputs = Parallel(n_jobs=-1)(
-#         delayed(augment_data)(img_patches, msk_patches, skl_patches, operations)
-#         for i in range(iterations)
-#         )
-#     img_patches = np.stack([data[0] for data in outputs])
-#     msk_patches = np.stack([data[1] for data in outputs])
-#     skl_patches = np.stack([data[2] for data in outputs]) 
+    # Execute parallel augmentation for each iteration
+    outputs = Parallel(n_jobs=-1)(
+        delayed(augment_data)(img_patches, msk_patches, operations)
+        for i in range(iterations)
+        )
+    img_patches = np.stack([data[0] for data in outputs])
+    msk_patches = np.stack([data[1] for data in outputs])
     
-#     # Display 
-#     viewer = napari.Viewer()
-#     viewer.add_image(img_patches)
-#     viewer.add_image(msk_patches) 
-#     viewer.add_image(skl_patches)
+    # # Display 
+    # viewer = napari.Viewer()
+    # viewer.add_image(img_patches)
+    # viewer.add_image(msk_patches) 
 
 #%% Model training ------------------------------------------------------------
 
@@ -123,20 +121,20 @@ model.compile(
 
 # Checkpoint & callbacks
 model_checkpoint_callback = ModelCheckpoint(
-    filepath="model_weights.h5",
+    filepath=f"model_weights_{mask_type}.h5",
     save_weights_only=True,
     monitor='val_loss',
     mode='min',
     save_best_only=True
     )
 callbacks = [
-    EarlyStopping(patience=20, monitor='val_loss'),
+    EarlyStopping(patience=10, monitor='val_loss'),
     model_checkpoint_callback
     ]
 
 # train model
 history = model.fit(
-    x=img_patches, y=skl_patches,
+    x=img_patches, y=msk_patches,
     validation_split=validation_split,
     batch_size=batch_size,
     epochs=n_epochs,

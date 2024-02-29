@@ -34,7 +34,7 @@ viewer.text_overlay.visible = True
 
 # Open first image
 while True:
-    idx   = random.randint(0, len(metadata))
+    idx   = random.randint(0, len(metadata) - 1)
     path  = metadata[idx]["path"]
     if not Path(str(path).replace(".tif", "_mask.tif")).exists():
         image = io.imread(path)

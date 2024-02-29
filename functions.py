@@ -2,7 +2,10 @@
 
 import numpy as np
 from joblib import Parallel, delayed 
-from skimage.morphology import skeletonize
+from scipy.ndimage import distance_transform_edt
+from skimage.morphology import (
+    disk, binary_erosion, binary_dilation
+    )
 
 #%% Functions -----------------------------------------------------------------
 
@@ -26,20 +29,50 @@ def preprocess(hstack):
 
 # -----------------------------------------------------------------------------
 
-def get_skel(msk):
+# def get_skel(msk):
+    
+#     labels = np.unique(msk)[1:]
+#     skel = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
+#     for l, label in enumerate(labels):
+#         tmp = msk == label
+#         tmp = skeletonize(tmp, method="lee")
+#         skel[l,...] = tmp
+#     skel = np.max(skel, axis=0)
+    
+#     return skel
+
+def get_bodies(msk):
     
     labels = np.unique(msk)[1:]
-    skel = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
+    edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
     for l, label in enumerate(labels):
         tmp = msk == label
-        tmp = skeletonize(tmp, method="lee")
-        skel[l,...] = tmp
-    skel = np.max(skel, axis=0)
+        tmp = distance_transform_edt(tmp)
+        pMax = np.percentile(tmp[tmp > 0], 99.9)
+        tmp[tmp > pMax] = pMax
+        tmp = (tmp / pMax)
+        edm[l,...] = tmp
+    edm = np.max(edm, axis=0).astype("float32")  
     
-    return skel
+    return edm
 
-# def get_edm(msk)
-
+def get_outlines(msk):
+    
+    labels = np.unique(msk)[1:]
+    edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
+    for l, label in enumerate(labels):
+        tmp = msk == label
+        tmp = tmp ^ binary_erosion(tmp)
+        tmp = binary_dilation(tmp, footprint=disk(3))
+        tmp = distance_transform_edt(tmp)
+        pMax = np.percentile(tmp[tmp > 0], 99.9)
+        tmp[tmp > pMax] = pMax
+        tmp = (tmp / pMax)
+        edm[l,...] = tmp
+    edm = np.max(edm, axis=0).astype("float32")
+    
+    return edm
+    
 # -----------------------------------------------------------------------------
 
 def get_patches(arr, size, overlap):
