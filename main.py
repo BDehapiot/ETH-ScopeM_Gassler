@@ -5,6 +5,7 @@ import napari
 import numpy as np
 from skimage import io
 from pathlib import Path
+import matplotlib.pyplot as plt
 import segmentation_models as sm
 from joblib import Parallel, delayed 
 
@@ -15,14 +16,15 @@ from functions import preprocess, get_patches, merge_patches
 
 # Paths
 loc_path = Path("D:/local_Gassler/data")
-model_bodies_path = Path(Path.cwd(), f"model_weights_bodies.h5")
-model_outlines_path = Path(Path.cwd(), f"model_weights_outlines.h5")
-exp_name, exp_numb = "IND", "003"
+data_path = Path(Path.cwd(), "data")
+model_bodies_path = Path(Path.cwd(), "model_weights_bodies.h5")
+model_outlines_path = Path(Path.cwd(), "model_weights_outlines.h5")
+exp_name, exp_numb = "R02", "002"
 
 # Patches
 downscale_factor = 4
 size = 512 // downscale_factor
-overlap = size // 4
+overlap = size // 2
 
 #%% Preprocessing -------------------------------------------------------------
 
@@ -49,54 +51,79 @@ model.compile(
 
 # Load weights & predict
 model.load_weights(model_bodies_path) 
-predict_bodies = model.predict(patches).squeeze()
+predBod = model.predict(patches).squeeze()
 model.load_weights(model_outlines_path) 
-predict_outlines = model.predict(patches).squeeze()
+predOut = model.predict(patches).squeeze()
 
 # Merge patches
 print("Merge patches   :", end='')
 t0 = time.time()
-predict_bodies = merge_patches(predict_bodies, C1_min.shape, size, overlap)
-predict_outlines = merge_patches(predict_outlines, C1_min.shape, size, overlap)
+predBod = merge_patches(predBod, C1_min.shape, size, overlap)
+predOut = merge_patches(predOut, C1_min.shape, size, overlap)
 t1 = time.time()
 print(f" {(t1-t0):<5.2f}s") 
 
 # Display
 viewer = napari.Viewer()
-viewer.add_image(predict_bodies) 
-viewer.add_image(predict_outlines) 
+viewer.add_image(C1_min,  blending="additive", opacity=0.33) 
+viewer.add_image(predBod, blending="additive", colormap="bop blue") 
+viewer.add_image(predOut, blending="additive", colormap="bop orange") 
 
 #%%
 
-# from skimage.measure import label
-# from skimage.segmentation import watershed
+# tmp1 = np.gradient(np.std(predBod, axis=(1, 2)))
+# tmp2 = np.gradient(np.std(predOut, axis=(1, 2)))
+# plt.plot(tmp1)
+# plt.plot(tmp2)
+# plt.plot((tmp1 + tmp2) / 2)
+
+# tmp1 = np.gradient(np.std(C1_min, axis=(1, 2)))
+# plt.plot(tmp1)
+
+#%%
+
+# from skimage.filters import gaussian
+# from skimage.measure import label, regionprops
 
 # # -----------------------------------------------------------------------------
 
-# markers = label(predict > 0.5) + 1
-# borders = (predict > 0.001) & (predict < 0.5)
-# markers[borders == True] = 0
+# sigma = 0.5
 
-# wat = []
-# for t in range(markers.shape[0]):
-#     tmp = watershed(
-#         predict[t,...], 
-#         markers=markers[t,...],
-#         compactness=10,
-#         watershed_line=True,
-#         )
-#     wat.append(tmp)
-# wat = np.stack(wat)
-# # wat[mask == 0] = 0
+# # -----------------------------------------------------------------------------
+
+# # Get mask
+# predict = (
+#     gaussian(predBod, sigma=(0, sigma, sigma)) -
+#     gaussian(predOut, sigma=(0, sigma, sigma)) * 0.5 # Parameters
+#     )
+# predict[predict < 0] = 0
+# mask = predict > 0.25 # Parameters
+
+# # Get labels
+# labels = []
+# labels.append(label(mask[0, ...]))
+# for t in range(1, mask.shape[0]):
+#     templabels = label(mask[t, ...])
+#     props = regionprops(templabels)
+#     for prop in props:
+#         idx = (prop.coords[:, 0], prop.coords[:, 1])
+#         values = labels[t - 1][idx]
+#         values = values[values != 0]
+#         values, counts = np.unique(values, return_counts=True)
+#         if values.size == 0:
+#             mode = 0
+#         else:
+#             mode = values[np.argmax(counts)]
+#         templabels[idx] = mode
+#     labels.append(templabels)   
+# labels = np.stack(labels)
+        
+# # -----------------------------------------------------------------------------
 
 # # Display
 # viewer = napari.Viewer()
-# viewer.add_image(predict) 
-# viewer.add_labels(markers) 
-# viewer.add_labels(wat)
-
-# # Display
-# viewer = napari.Viewer()
-# viewer.add_image(predict) 
-# viewer.add_image(markers, colormap="green", opacity=0.33) 
-# viewer.add_image(borders, colormap="magenta", opacity=0.33) 
+# viewer.add_image(C1_min)
+# viewer.add_labels(labels)
+# # viewer.add_image(predBod) 
+# # viewer.add_image(predOut) 
+# # viewer.add_image(predict) 

@@ -24,19 +24,19 @@ train_path = Path(Path.cwd(), 'data', 'train')
 # Patches
 downscale_factor = 4
 size = 512 // downscale_factor
-overlap = size // 4
+overlap = size // 2
 
 # Mask type
-mask_type = "bodies" # "bodies" or "outlines"
+mask_type = "outlines" # "bodies" or "outlines"
 
 # Data augmentation
 random.seed(42)
-iterations = 2000
+iterations = 3000
 
 # Train model
 validation_split = 0.2
 n_epochs = 100
-batch_size = 16
+batch_size = 32
 
 #%% Pre-processing ------------------------------------------------------------
 
