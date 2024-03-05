@@ -5,6 +5,7 @@ import napari
 import numpy as np
 from skimage import io
 from pathlib import Path
+import matplotlib.pyplot as plt
 import segmentation_models as sm
 from joblib import Parallel, delayed 
 
@@ -15,13 +16,15 @@ from functions import preprocess, get_patches, merge_patches
 
 # Paths
 loc_path = Path("D:/local_Gassler/data")
-model_path = Path(Path.cwd(), "model_weights.h5")
-exp_name, exp_numb = "IND", "003"
+data_path = Path(Path.cwd(), "data")
+model_bodies_path = Path(Path.cwd(), "model_weights_bodies.h5")
+model_outlines_path = Path(Path.cwd(), "model_weights_outlines.h5")
+exp_name, exp_numb = "R20", "001"
 
 # Patches
 downscale_factor = 4
 size = 512 // downscale_factor
-overlap = size // 8
+overlap = size // 2
 
 #%% Preprocessing -------------------------------------------------------------
 
@@ -46,92 +49,97 @@ model.compile(
     metrics=['mse']
     )
 
-# Load weights
-model.load_weights(model_path) 
-
-# Predict
-predict = model.predict(patches).squeeze()
+# Load weights & predict
+model.load_weights(model_bodies_path) 
+predBod = model.predict(patches).squeeze()
+model.load_weights(model_outlines_path) 
+predOut = model.predict(patches).squeeze()
 
 # Merge patches
 print("Merge patches   :", end='')
 t0 = time.time()
-predict = merge_patches(predict, C1_min.shape, size, overlap)
+predBod = merge_patches(predBod, C1_min.shape, size, overlap)
+predOut = merge_patches(predOut, C1_min.shape, size, overlap)
 t1 = time.time()
 print(f" {(t1-t0):<5.2f}s") 
 
+# # Display
+# viewer = napari.Viewer()
+# viewer.add_image(C1_min,  blending="additive", opacity=0.33) 
+# viewer.add_image(predBod, blending="additive", colormap="bop blue") 
+# viewer.add_image(predOut, blending="additive", colormap="bop orange") 
+
 #%%
 
-from skimage.measure import label
 from skimage.filters import gaussian
-from skimage.segmentation import watershed
-from skimage.feature import peak_local_max
-from skimage.morphology import square, binary_dilation
+from skimage.measure import label, regionprops
+from skimage.morphology import binary_dilation
 
 # -----------------------------------------------------------------------------
 
-# Parameters
-sigma = 1
-thresh = 0.1
-mdist = 5
-prom = 0.5
+sigma = (0, 1, 1)
 
 # -----------------------------------------------------------------------------
 
-def get_objects(predict, sigma, thresh, mdist, prom):
-    
-    # Nested functions --------------------------------------------------------
-    
-    def _get_locmax(img):
-        coords = peak_local_max(img, min_distance=mdist, threshold_abs=prom)
-        coords = tuple((coords[:, 0], coords[:, 1]))
-        locmax = np.zeros_like(img)
-        locmax[coords] = 1
-        locmax = binary_dilation(locmax, footprint=square(5)) # to be removed
-        return locmax
-    
-    # Execute -----------------------------------------------------------------
-    
-    predict = gaussian(predict, sigma=(0, sigma, sigma))
-    mask = predict > thresh
-    
-    locmax = Parallel(n_jobs=-1)(
-        delayed(_get_locmax)(img)
-        for img in predict
-        )
-    locmax = np.stack(locmax)
-    
-    return mask, locmax
-        
-# -----------------------------------------------------------------------------
+# Get mask 
+mask = predBod > 0.1
+mask[predOut > 0.25] = 0
+mask = gaussian(mask, sigma=sigma) > 0.5
 
-mask, locmax = get_objects(predict, sigma, thresh, mdist, prom)
+# Get outlines
+outl = []
+for msk in mask:
+    outl.append(binary_dilation(msk) ^ msk)
+outl = np.stack(outl)
 
-# -----------------------------------------------------------------------------
-
-wat = []
-for t in range(mask.shape[0]):
-    
-    tmp = watershed(
-        predict[t,...], 
-        # markers=label(locmax[t,...]),
-        compactness=10,
-        watershed_line=True,
-        )
-    
-    wat.append(tmp)
-    
-wat = np.stack(wat)
-wat[mask == 0] = 0
+# Get labels
+labels = []
+labels.append(label(mask[0, ...]))
+for t in range(1, mask.shape[0]):
+    labs = label(mask[t, ...])
+    med = np.median(np.stack(labels), axis=0)
+    props = regionprops(labs)    
+    for prop in props:
+        idx = (prop.coords[:, 0], prop.coords[:, 1])
+        values = med[idx]
+        values = values[values != 0]
+        values, counts = np.unique(values, return_counts=True)
+        mode = 0 if values.size == 0 else values[np.argmax(counts)]
+        labs[idx] = mode
+    labels.append(labs)
+labels = np.stack(labels)
 
 # -----------------------------------------------------------------------------
 
 # Display
 viewer = napari.Viewer()
-viewer.add_labels(wat) 
-# viewer.add_image(locmax)
+viewer.add_image(C1_min, opacity=0.33)
+viewer.add_image(predBod, colormap="bop blue", blending="additive")
+viewer.add_image(predOut, colormap="bop orange", blending="additive")
+viewer.add_image(outl, blending="additive")
+# viewer.add_labels(labels)
 
-# # Display
-# viewer = napari.Viewer()
-# viewer.add_image(predict, opacity=0.5) 
-# viewer.add_image(mask, blending="additive", colormap="red", opacity=0.5) 
-# viewer.add_image(locmax, blending="additive", colormap="gray") 
+#%%
+
+from skimage.draw import rectangle_perimeter
+
+# -----------------------------------------------------------------------------
+
+display = np.zeros_like(labels)
+for t in range(labels.shape[0]):
+    # labs = labels[t, ...]
+    labs = label(mask[t, ...])
+    for lab in np.unique(labs):
+        idx = np.where(labs == lab)
+        start = (np.min(idx[0]), np.min(idx[1]))
+        end = (np.max(idx[0]), np.max(idx[1]))
+        rr, cc = rectangle_perimeter(start, end,
+            shape=display[t, ...].shape 
+            )
+        display[t, rr, cc] = 1
+        
+viewer = napari.Viewer()
+viewer.add_image(C1_min, opacity=0.33)
+viewer.add_image(display, blending="additive")
+viewer.add_image(outl, blending="additive")
+viewer.add_labels(labels)
