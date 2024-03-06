@@ -73,6 +73,23 @@ def next_image():
             viewer.text_overlay.text = path.name
             viewer.reset_view()
             break 
+        
+def skip_image():
+       
+    # Open next image
+    while True:
+        idx   = random.randint(0, len(metadata))
+        path  = metadata[idx]["path"]
+        if not Path(str(path).replace(".tif", f"_mask-{mask_type}.tif")).exists():
+            image = io.imread(path)
+            mask  = np.zeros_like(image, dtype="uint8")
+            viewer.layers["image"].data = image
+            viewer.layers["image"].metadata = metadata[idx]
+            viewer.layers["mask" ].data = mask
+            viewer.layers["mask"].selected_label = 2
+            viewer.text_overlay.text = path.name
+            viewer.reset_view()
+            break 
 
 def next_label():
     viewer.layers["mask"].selected_label += 1 
@@ -91,6 +108,10 @@ def paint():
 @napari.Viewer.bind_key('Enter', overwrite=True)
 def next_image_key(viewer):
     next_image()
+    
+@napari.Viewer.bind_key('Space', overwrite=True)
+def skip_image_key(viewer):
+    skip_image()
     
 @napari.Viewer.bind_key('PageUp', overwrite=True)
 def next_label_key(viewer):

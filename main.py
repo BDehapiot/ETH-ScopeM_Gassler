@@ -20,7 +20,7 @@ data_path = Path(Path.cwd(), "data")
 model_all_path = Path(Path.cwd(), "model_weights_all.h5")
 model_outlines_path = Path(Path.cwd(), "model_weights_outlines.h5")
 model_bodies_path = Path(Path.cwd(), "model_weights_bodies.h5")
-exp_name, exp_numb = "IND", "001"
+exp_name, exp_numb = "IND", "004"
 
 # Patches
 downscale_factor = 4
@@ -67,12 +67,70 @@ predBod = merge_patches(predBod, C1_min.shape, size, overlap)
 t1 = time.time()
 print(f" {(t1-t0):<5.2f}s") 
 
+# # Display
+# viewer = napari.Viewer()
+# viewer.add_image(C1_min,  blending="additive", opacity=0.33) 
+# viewer.add_image(predAll, blending="additive", colormap="bop blue") 
+# viewer.add_image(predOut, blending="additive", colormap="bop orange") 
+# viewer.add_image(predBod, blending="additive", colormap="bop purple") 
+
+#%%
+
+from skimage.filters import gaussian
+from skimage.measure import label, regionprops
+from skimage.morphology import binary_dilation, skeletonize, remove_small_objects
+
+# -----------------------------------------------------------------------------
+
+# Parameters
+sigma = 1
+threshAll = 0.05
+threshOut = 0.25
+threshBod = 0.05
+min_size = 32
+
+# -----------------------------------------------------------------------------
+
+# Get masks
+maskAll, maskOut, maskBod, outlOut = [], [], [], []
+for t in range(C1_min.shape[0]):
+    
+    # Create masks
+    mAll = gaussian(predAll[t, ...], sigma=sigma) > threshAll
+    mOut = gaussian(predOut[t, ...], sigma=sigma) > threshOut
+    mBod = gaussian(predBod[t, ...], sigma=sigma) > threshBod
+    mAll = remove_small_objects(mAll, min_size=min_size)
+    mOut = remove_small_objects(mOut, min_size=min_size)
+    oOut = skeletonize(mOut, method="lee")
+    # mAll[oOut == 255] = 0
+    # mAll = remove_small_objects(mAll, min_size=min_size)
+    
+    # # Filter masks
+    # for prop in regionprops(label(mAll, connectivity=1)):
+    #     idx = (prop.coords[:, 0], prop.coords[:, 1])
+    #     roundness = 4 * np.pi * prop.area / (prop.perimeter ** 2)
+    #     if roundness < 0.5:
+    #         mAll[idx] = 0
+        
+    # Append
+    maskAll.append(mAll)
+    maskOut.append(mOut)
+    maskBod.append(mBod)
+    outlOut.append(oOut)
+    
+maskAll = np.stack(maskAll)
+maskOut = np.stack(maskOut)
+maskBod = np.stack(maskBod)
+outlOut = np.stack(outlOut)
+
+# -----------------------------------------------------------------------------
+
 # Display
 viewer = napari.Viewer()
 viewer.add_image(C1_min,  blending="additive", opacity=0.33) 
-viewer.add_image(predAll, blending="additive", colormap="bop blue") 
-viewer.add_image(predOut, blending="additive", colormap="bop orange") 
-viewer.add_image(predBod, blending="additive", colormap="bop purple") 
+viewer.add_image(maskAll, blending="additive", colormap="magenta") 
+viewer.add_image(maskOut, blending="additive", colormap="bop blue") 
+viewer.add_image(maskBod, blending="additive", colormap="bop orange") 
 
 #%%
 
