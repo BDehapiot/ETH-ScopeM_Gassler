@@ -29,19 +29,7 @@ def preprocess(hstack):
 
 # -----------------------------------------------------------------------------
 
-# def get_skel(msk):
-    
-#     labels = np.unique(msk)[1:]
-#     skel = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
-#     for l, label in enumerate(labels):
-#         tmp = msk == label
-#         tmp = skeletonize(tmp, method="lee")
-#         skel[l,...] = tmp
-#     skel = np.max(skel, axis=0)
-    
-#     return skel
-
-def get_bodies(msk):
+def get_all(msk):
     
     labels = np.unique(msk)[1:]
     edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))

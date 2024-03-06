@@ -17,8 +17,9 @@ from functions import preprocess, get_patches, merge_patches
 # Paths
 loc_path = Path("D:/local_Gassler/data")
 data_path = Path(Path.cwd(), "data")
-model_bodies_path = Path(Path.cwd(), "model_weights_bodies.h5")
+model_all_path = Path(Path.cwd(), "model_weights_all.h5")
 model_outlines_path = Path(Path.cwd(), "model_weights_outlines.h5")
+model_bodies_path = Path(Path.cwd(), "model_weights_bodies.h5")
 exp_name, exp_numb = "IND", "001"
 
 # Patches
@@ -50,58 +51,107 @@ model.compile(
     )
 
 # Load weights & predict
-model.load_weights(model_bodies_path) 
-predBod = model.predict(patches).squeeze()
+model.load_weights(model_all_path) 
+predAll = model.predict(patches).squeeze()
 model.load_weights(model_outlines_path) 
 predOut = model.predict(patches).squeeze()
+model.load_weights(model_bodies_path) 
+predBod = model.predict(patches).squeeze()
 
 # Merge patches
-print("Merge patches   :", end='')
+print("Merge patches :", end='')
 t0 = time.time()
-predBod = merge_patches(predBod, C1_min.shape, size, overlap)
+predAll = merge_patches(predAll, C1_min.shape, size, overlap)
 predOut = merge_patches(predOut, C1_min.shape, size, overlap)
+predBod = merge_patches(predBod, C1_min.shape, size, overlap)
 t1 = time.time()
 print(f" {(t1-t0):<5.2f}s") 
 
-# # Display
-# viewer = napari.Viewer()
-# viewer.add_image(C1_min,  blending="additive", opacity=0.33) 
-# viewer.add_image(predBod, blending="additive", colormap="bop blue") 
-# viewer.add_image(predOut, blending="additive", colormap="bop orange") 
+# Display
+viewer = napari.Viewer()
+viewer.add_image(C1_min,  blending="additive", opacity=0.33) 
+viewer.add_image(predAll, blending="additive", colormap="bop blue") 
+viewer.add_image(predOut, blending="additive", colormap="bop orange") 
+viewer.add_image(predBod, blending="additive", colormap="bop purple") 
 
 #%%
 
-from skimage.filters import gaussian
-from skimage.measure import label, regionprops
-from skimage.morphology import binary_dilation, skeletonize, remove_small_objects
+# from skimage.filters import gaussian
+# from skimage.measure import label, regionprops
+# from skimage.morphology import binary_dilation, skeletonize, remove_small_objects
 
 # -----------------------------------------------------------------------------
 
-# Do the same but processing in 2D (problem with removing small object for expl)
+# # Parameters
+# sigma = 1
+# threshAll = 0.05
+# threshOut = 0.25
+# min_size = 32
 
-maskBod = gaussian(predBod, sigma=(0, 1, 1)) > 0.1
-maskOut = gaussian(predOut, sigma=(0, 1, 1)) > 0.25
-maskBod = remove_small_objects(maskBod, min_size=128)
-maskOut = remove_small_objects(maskOut, min_size=128)
+# -----------------------------------------------------------------------------
 
-outlOut = []
-for t in range(maskOut.shape[0]):
-    outlOut.append(skeletonize(maskOut[t, ...], method="lee"))
-outlOut = np.stack(outlOut)
-maskBod[outlOut == 255] = 0
-maskBod = remove_small_objects(maskBod, min_size=512, connectivity=0)
+# # Get masks
+# maskAll, maskOut, outlOut, rndsMap = [], [], [], []
+# for t in range(C1_min.shape[0]):
+    
+#     # Create masks
+#     mAll = gaussian(predAll[t, ...], sigma=1) > threshAll
+#     mOut = gaussian(predOut[t, ...], sigma=1) > threshOut
+#     mAll = remove_small_objects(mAll, min_size=min_size)
+#     mOut = remove_small_objects(mOut, min_size=min_size)
+#     oOut = skeletonize(mOut, method="lee")
+#     mAll[oOut == 255] = 0
+#     mAll = remove_small_objects(mAll, min_size=min_size)
+    
+#     # Filter masks
+#     for prop in regionprops(label(mAll, connectivity=1)):
+#         idx = (prop.coords[:, 0], prop.coords[:, 1])
+#         roundness = 4 * np.pi * prop.area / (prop.perimeter ** 2)
+#         if roundness < 0.5:
+#             mAll[idx] = 0
+        
+#     # Append
+#     maskAll.append(mAll)
+#     maskOut.append(mOut)
+#     outlOut.append(oOut)
+    
+# maskAll = np.stack(maskAll)
+# maskOut = np.stack(maskOut)
+# outlOut = np.stack(outlOut)
+
+# # Get labels
+# labels = []
+# labels.append(label(maskAll[0, ...], connectivity=1))
+# for t in range(1, maskAll.shape[0]):
+#     labs = label(maskAll[t, ...], connectivity=1)
+#     med = np.median(np.stack(labels), axis=0)
+#     props = regionprops(labs)    
+#     for prop in props:
+#         idx = (prop.coords[:, 0], prop.coords[:, 1])
+#         values = med[idx]
+#         values = values[values != 0]
+#         values, counts = np.unique(values, return_counts=True)
+#         mode = 0 if values.size == 0 else values[np.argmax(counts)]
+#         labs[idx] = mode
+#     labels.append(labs)
+# labels = np.stack(labels)
 
 # Display
-viewer = napari.Viewer()
-viewer.add_image(maskBod, blending="additive", colormap="bop blue", opacity=0.5)
-viewer.add_image(maskOut, blending="additive", colormap="bop orange", opacity=0.5)
-viewer.add_image(outlOut, blending="additive", colormap="bop orange")
+# viewer = napari.Viewer()
+# viewer.add_image(C1_min,  blending="additive", opacity=0.33) 
+# viewer.add_image(maskAll, blending="additive", colormap="bop blue", opacity=0.5)
+# viewer.add_image(maskOut, blending="additive", colormap="bop orange", opacity=0.5)
+# viewer.add_image(outlOut, blending="additive", colormap="bop orange")
+# viewer.add_labels(labels)
 
-# -----------------------------------------------------------------------------
+#%%
 
 # objectData = []
-# for msk in mask:
-#     lab = label(msk)
+# for mAll in maskAll:
+#     lab = label(mAll, connectivity=1)
 #     objectData.append(len(np.unique(lab)))
 # nObject = np.stack(objectData)
-# plt.plot(np.gradient(nObject))
+# tf = np.argmax(np.gradient(nObject))
+# # plt.plot(np.gradient(nObject))
+
+

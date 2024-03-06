@@ -8,13 +8,17 @@ from pathlib import Path
 
 #%% Inputs --------------------------------------------------------------------
 
+# Mask type
+# mask_type = "all" 
+mask_type = "bodies" 
+
 # Paths
 train_path = Path(Path.cwd(), 'data', 'train') 
 
 # Parameters
 random.seed(42)
 contrast_limits = (0, 2)
-brush_size = 12
+brush_size = 10 if mask_type == "all" else 6
 
 #%%
 
@@ -36,13 +40,14 @@ viewer.text_overlay.visible = True
 while True:
     idx   = random.randint(0, len(metadata) - 1)
     path  = metadata[idx]["path"]
-    if not Path(str(path).replace(".tif", "_mask.tif")).exists():
+    if not Path(str(path).replace(".tif", f"_mask-{mask_type}.tif")).exists():
         image = io.imread(path)
         mask  = np.zeros_like(image, dtype="uint8")
         viewer.add_image(image, name="image", metadata=metadata[idx])
         viewer.add_labels(mask, name="mask")
         viewer.layers["image"].contrast_limits = contrast_limits
         viewer.layers["mask"].brush_size = brush_size
+        viewer.layers["mask"].selected_label = 2
         viewer.layers["mask"].mode = 'paint'
         viewer.text_overlay.text = path.name
         break 
@@ -51,20 +56,20 @@ def next_image():
     
     # Save previous mask
     path = viewer.layers["image"].metadata["path"]
-    path = Path(str(path).replace(".tif", "_mask.tif"))
+    path = Path(str(path).replace(".tif", f"_mask-{mask_type}.tif"))
     io.imsave(path, viewer.layers["mask"].data, check_contrast=False)  
     
     # Open next image
     while True:
         idx   = random.randint(0, len(metadata))
         path  = metadata[idx]["path"]
-        if not Path(str(path).replace(".tif", "_mask.tif")).exists():
+        if not Path(str(path).replace(".tif", f"_mask-{mask_type}.tif")).exists():
             image = io.imread(path)
             mask  = np.zeros_like(image, dtype="uint8")
             viewer.layers["image"].data = image
             viewer.layers["image"].metadata = metadata[idx]
             viewer.layers["mask" ].data = mask
-            viewer.layers["mask"].selected_label = 1
+            viewer.layers["mask"].selected_label = 2
             viewer.text_overlay.text = path.name
             viewer.reset_view()
             break 
@@ -73,7 +78,7 @@ def next_label():
     viewer.layers["mask"].selected_label += 1 
 
 def previous_label():
-    if viewer.layers["mask"].selected_label > 1:
+    if viewer.layers["mask"].selected_label > 2:
         viewer.layers["mask"].selected_label -= 1 
         
 def erase():

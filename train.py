@@ -14,7 +14,7 @@ from joblib import Parallel, delayed
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # Functions
-from functions import get_bodies, get_outlines, get_patches
+from functions import get_all, get_outlines, get_patches
 
 #%% Inputs --------------------------------------------------------------------
 
@@ -27,7 +27,9 @@ size = 512 // downscale_factor
 overlap = size // 2
 
 # Mask type
-mask_type = "outlines" # "bodies" or "outlines"
+# mask_type = "all"
+# mask_type = "outlines"
+mask_type = "bodies"
 
 # Data augmentation
 random.seed(42)
@@ -42,21 +44,29 @@ batch_size = 32
 
 img_patches, msk_patches = [], []
 for path in train_path.iterdir():
-    if 'mask' in path.name:
-        
-        # Open data
-        msk = io.imread(path)
-        img = io.imread(str(path).replace('_mask', ''))
-                
-        # Convert masks
-        if mask_type == "bodies":
-            msk = get_bodies(msk)
-        if mask_type == "outlines":
+    
+    if mask_type == "all": 
+        if 'mask-all' in path.name:
+            msk = io.imread(path)
+            img = io.imread(str(path).replace('_mask-all', ''))
+            msk = get_all(msk)
+            img_patches.append(get_patches(img, size, overlap))
+            msk_patches.append(get_patches(msk, size, overlap))
+    
+    if mask_type == "outlines": 
+        if 'mask-all' in path.name:
+            msk = io.imread(path)
+            img = io.imread(str(path).replace('_mask-all', ''))
             msk = get_outlines(msk)
-                        
-        # Extract patches
-        img_patches.append(get_patches(img, size, overlap))
-        msk_patches.append(get_patches(msk, size, overlap))
+            img_patches.append(get_patches(img, size, overlap))
+            msk_patches.append(get_patches(msk, size, overlap))
+    
+    if mask_type == "bodies":
+        if 'mask-bodies' in path.name:
+            msk = (io.imread(path) > 0).astype("float32")
+            img = io.imread(str(path).replace('_mask-bodies', ''))
+            img_patches.append(get_patches(img, size, overlap))
+            msk_patches.append(get_patches(msk, size, overlap))
 
 img_patches = np.stack([patch for patches in img_patches for patch in patches])
 msk_patches = np.stack([patch for patches in msk_patches for patch in patches])
