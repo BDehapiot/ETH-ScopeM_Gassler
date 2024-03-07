@@ -9,8 +9,8 @@ from pathlib import Path
 #%% Inputs --------------------------------------------------------------------
 
 # Mask type
-# mask_type = "all" 
-mask_type = "bodies" 
+mask_type = "all" 
+# mask_type = "bodies" 
 
 # Paths
 train_path = Path(Path.cwd(), 'data', 'train') 

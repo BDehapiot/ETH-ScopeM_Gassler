@@ -19,11 +19,11 @@ train_path = Path(Path.cwd(), 'data', 'train')
 
 msks, imgs = [], []
 for path in train_path.iterdir():
-    if 'mask' in path.name:
+    if 'mask-all' in path.name:
         
         # Open data
         msk = io.imread(path)
-        img = io.imread(str(path).replace('_mask', ''))
+        img = io.imread(str(path).replace('_mask-all', ''))
         
         # Append
         msks.append(msk)
@@ -42,16 +42,22 @@ imgs = np.stack(imgs)
 from skimage.filters import gaussian
 from skimage.morphology import skeletonize, binary_erosion
 from scipy.ndimage import distance_transform_edt
+from skimage.segmentation import mark_boundaries
 
-msk = msks[9]
-labels = np.unique(msk)[1:]
-borders = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
-for l, label in enumerate(labels):
-    tmp = msk == label
-    tmp = tmp ^ binary_erosion(tmp)
-    # tmp = gaussian(tmp.astype("float32"), sigma=2)
-    borders[l,...] = tmp
-borders = np.max(borders, axis=0)
+msk = msks[7]
+borders = mark_boundaries(msk, label_img=msk, mode="outer")
+
+
+
+
+# labels = np.unique(msk)[1:]
+# borders = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
+# for l, label in enumerate(labels):
+#     tmp = msk == label
+#     tmp = tmp ^ binary_erosion(tmp)
+#     # tmp = gaussian(tmp.astype("float32"), sigma=2)
+#     borders[l,...] = tmp
+# borders = np.max(borders, axis=0)
 
 # labels = np.unique(msk)[1:]
 # edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))

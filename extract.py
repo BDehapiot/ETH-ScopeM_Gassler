@@ -23,7 +23,7 @@ C1_paths = list(loc_path.glob("**/*C1*.tif"))
 
 # Frame selection
 np.random.seed(42)
-nFrame = 30 # number of randomly selected frames
+nFrame = 60 # number of randomly selected frames
 
 # Parameters
 downscale_factor = 4
