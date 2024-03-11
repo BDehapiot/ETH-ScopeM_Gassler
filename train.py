@@ -28,9 +28,9 @@ size = 512 // downscale_factor
 overlap = size // 2
 
 # Mask type
-mask_type = "all"
+# mask_type = "all"
 # mask_type = "outlines"
-# mask_type = "bodies"
+mask_type = "bodies"
 
 # Data augmentation
 random.seed(42)
@@ -116,73 +116,9 @@ if augment:
 
 #%% Model training ------------------------------------------------------------
 
-# Define & compile model
-model = sm.Unet(
-    'resnet34',
-    input_shape=(None, None, 1), 
-    classes=1, 
-    activation='sigmoid', 
-    encoder_weights=None,
-    )
-model.compile(
-    optimizer='adam',
-    loss='binary_crossentropy', 
-    metrics=['mse']
-    )
-
-# Checkpoint & callbacks
-model_checkpoint_callback = ModelCheckpoint(
-    filepath=f"model_weights_{mask_type}.h5",
-    save_weights_only=True,
-    monitor='val_loss',
-    mode='min',
-    save_best_only=True
-    )
-callbacks = [
-    EarlyStopping(patience=10, monitor='val_loss'),
-    model_checkpoint_callback
-    ]
-
-# train model
-history = model.fit(
-    x=img_patches, y=msk_patches,
-    validation_split=validation_split,
-    batch_size=batch_size,
-    epochs=n_epochs,
-    callbacks=callbacks,
-    )
-
-# Plot training results
-loss = history.history['loss']
-val_loss = history.history['val_loss']
-epochs = range(1, len(loss) + 1)
-plt.plot(epochs, loss, 'y', label='Training loss')
-plt.plot(epochs, val_loss, 'r', label='Validation loss')
-plt.title('Training and validation loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
-plt.legend()
-plt.show()
-
-#%% Model training ------------------------------------------------------------
-
-# def dice_coefficient(y_true, y_pred, smooth=1):
-#     y_true_f = tf.cast(tf.reshape(y_true, [-1]), tf.float32)
-#     y_pred_f = tf.cast(tf.reshape(y_pred, [-1]), tf.float32)
-#     intersection = tf.reduce_sum(y_true_f * y_pred_f)
-#     return (2. * intersection + smooth) / (tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + smooth)
-
-# def dice_loss(y_true, y_pred):
-#     return 1 - dice_coefficient(y_true, y_pred)
-
-# def combined_loss(y_true, y_pred):
-#     bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)(y_true, y_pred)
-#     dice = dice_loss(y_true, y_pred)
-#     return bce + dice
-
 # # Define & compile model
 # model = sm.Unet(
-#     'resnet34', 
+#     'resnet34',
 #     input_shape=(None, None, 1), 
 #     classes=1, 
 #     activation='sigmoid', 
@@ -190,9 +126,9 @@ plt.show()
 #     )
 # model.compile(
 #     optimizer='adam',
-#     loss=combined_loss, 
-#     metrics=['mse', dice_coefficient]
-# )
+#     loss='binary_crossentropy', 
+#     metrics=['mse']
+#     )
 
 # # Checkpoint & callbacks
 # model_checkpoint_callback = ModelCheckpoint(
@@ -227,3 +163,67 @@ plt.show()
 # plt.ylabel('Loss')
 # plt.legend()
 # plt.show()
+
+#%% Model training ------------------------------------------------------------
+
+def dice_coefficient(y_true, y_pred, smooth=1):
+    y_true_f = tf.cast(tf.reshape(y_true, [-1]), tf.float32)
+    y_pred_f = tf.cast(tf.reshape(y_pred, [-1]), tf.float32)
+    intersection = tf.reduce_sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + smooth)
+
+def dice_loss(y_true, y_pred):
+    return 1 - dice_coefficient(y_true, y_pred)
+
+def combined_loss(y_true, y_pred):
+    bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)(y_true, y_pred)
+    dice = dice_loss(y_true, y_pred)
+    return bce + dice
+
+# Define & compile model
+model = sm.Unet(
+    'resnet34', 
+    input_shape=(None, None, 1), 
+    classes=1, 
+    activation='sigmoid', 
+    encoder_weights=None,
+    )
+model.compile(
+    optimizer='adam',
+    loss=combined_loss, 
+    metrics=['mse', dice_coefficient]
+)
+
+# Checkpoint & callbacks
+model_checkpoint_callback = ModelCheckpoint(
+    filepath=f"model_weights_{mask_type}.h5",
+    save_weights_only=True,
+    monitor='val_loss',
+    mode='min',
+    save_best_only=True
+    )
+callbacks = [
+    EarlyStopping(patience=10, monitor='val_loss'),
+    model_checkpoint_callback
+    ]
+
+# train model
+history = model.fit(
+    x=img_patches, y=msk_patches,
+    validation_split=validation_split,
+    batch_size=batch_size,
+    epochs=n_epochs,
+    callbacks=callbacks,
+    )
+
+# Plot training results
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(1, len(loss) + 1)
+plt.plot(epochs, loss, 'y', label='Training loss')
+plt.plot(epochs, val_loss, 'r', label='Validation loss')
+plt.title('Training and validation loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
