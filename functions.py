@@ -20,12 +20,12 @@ def preprocess(hstack):
             hstack[t,z,...] /= np.mean(hstack[t,z,...])
             
     # Min. projection & 0 to 1 normalization
-    hstack_min = np.std(hstack, axis=1) # min or std 
-    pMax = np.percentile(hstack_min, 99.9)
-    hstack_min[hstack_min > pMax] = pMax
-    hstack_min = (hstack_min / pMax).astype("float32")
+    hstack_proj = np.std(hstack, axis=1) # min or std 
+    pMax = np.percentile(hstack_proj, 99.9)
+    hstack_proj[hstack_proj > pMax] = pMax
+    hstack_proj = (hstack_proj / pMax).astype("float32")
     
-    return hstack_min
+    return hstack_proj
 
 # -----------------------------------------------------------------------------
 

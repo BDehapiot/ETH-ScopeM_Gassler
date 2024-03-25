@@ -34,12 +34,12 @@ for C1_path in C1_paths:
     
     # Open and preprocess
     C1 = io.imread(C1_path)
-    C1_min = preprocess(C1)
+    C1_proj = preprocess(C1)
         
     # Select random frames
     rIdxs = np.random.randint(0, C1.shape[0] // 2, size=nFrame)
     for idx in rIdxs:        
         io.imsave(
             Path(train_path, C1_path.name.replace(".tif", f"_{idx:03d}.tif")),
-            C1_min[idx,...], check_contrast=False,
+            C1_proj[idx,...], check_contrast=False,
             )
