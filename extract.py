@@ -17,9 +17,9 @@ from functions import preprocess
 #%% Inputs --------------------------------------------------------------------
 
 # Path
-loc_path   = Path("D:/local_Gassler/data")
+local_path = Path("D:/local_Gassler/data")
 train_path = Path(Path.cwd(), 'data', 'train')
-C1_paths = list(loc_path.glob("**/*C1*.tif"))
+C1_paths = list(local_path.glob("**/*C1*.tif"))
 
 # Frame selection
 np.random.seed(42)

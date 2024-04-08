@@ -6,9 +6,14 @@ import napari
 import numpy as np
 from skimage import io
 from pathlib import Path
-import matplotlib.pyplot as plt
 import segmentation_models as sm
-from joblib import Parallel, delayed 
+
+# Skimage
+from skimage.filters import gaussian
+from skimage.draw import rectangle_perimeter
+from skimage.segmentation import clear_border
+from skimage.measure import label, regionprops
+from skimage.morphology import skeletonize, remove_small_objects
 
 # Functions
 from functions import preprocess, get_patches, merge_patches
@@ -16,22 +21,31 @@ from functions import preprocess, get_patches, merge_patches
 #%% Inputs --------------------------------------------------------------------
 
 # Paths
-loc_path = Path("D:/local_Gassler/data")
+local_path = Path("D:/local_Gassler/data")
 data_path = Path(Path.cwd(), "data")
 model_all_path = Path(Path.cwd(), "model_weights_all.h5")
 model_outlines_path = Path(Path.cwd(), "model_weights_outlines.h5")
 model_bodies_path = Path(Path.cwd(), "model_weights_bodies.h5")
-exp_name, exp_numb = "IND", "002"
+exp_name, exp_numb = "R11", "003"
 
 # Patches
 downscale_factor = 4
 size = 512 // downscale_factor
 overlap = size // 2
 
+# Parameters
+sigma = (0, 1, 1) #
+threshAll = 0.05 #
+threshOut = 0.25 #
+threshBod = 0.05 #
+min_size = 32 # 
+
 #%% Preprocessing -------------------------------------------------------------
 
-C1 = io.imread(Path(loc_path, f"C1_{exp_name}_{exp_numb}.tif"))
+C1 = io.imread(Path(local_path, f"{exp_name}_{exp_numb}_C1.tif"))
+C2 = io.imread(Path(local_path, f"{exp_name}_{exp_numb}_C2.tif"))
 C1_proj = preprocess(C1)
+C2_proj = np.sum(C2, axis=1)
 patches = get_patches(C1_proj, size, overlap)
 patches = np.stack(patches)
 
@@ -65,29 +79,12 @@ print(f" {(t1-t0):<5.2f}s")
 
 # # Display
 # viewer = napari.Viewer()
-# viewer.add_image(C1_proj,  blending="additive", opacity=0.33) 
+# viewer.add_image(C1_proj, blending="additive", opacity=0.33) 
 # viewer.add_image(predAll, blending="additive", colormap="bop blue") 
 # viewer.add_image(predOut, blending="additive", colormap="bop orange") 
 # viewer.add_image(predBod, blending="additive", colormap="bop purple") 
 
 #%% Process -------------------------------------------------------------------
-
-from skimage.filters import gaussian
-from skimage.draw import rectangle_perimeter
-from skimage.segmentation import clear_border
-from skimage.measure import label, regionprops
-from skimage.morphology import binary_dilation, skeletonize, remove_small_objects
-
-# -----------------------------------------------------------------------------
-
-# Parameters
-sigma = (0, 1, 1)
-threshAll = 0.05
-threshOut = 0.25
-threshBod = 0.05
-min_size = 32
-
-# -----------------------------------------------------------------------------
 
 # Get masks
 maskAll = gaussian(predAll, sigma=sigma) > threshAll
@@ -144,7 +141,7 @@ for t in range(1, pMaskAll.shape[0]):
         val1 = labels[t-1][idx]
         val2 = val1[val1 != 0]
         val3, counts = np.unique(val2, return_counts=True)
-        if val2.size > val1.size * 0.25: # Parameter
+        if val2.size > val1.size * 0.25: # Parameter !!!
             mode = val3[np.argmax(counts)]
         else:
             mode = 0
@@ -155,67 +152,81 @@ labels = np.stack(labels)
 
 # -----------------------------------------------------------------------------
 
+# Get objects + display
 objects = []
 display = np.zeros_like(labels)
 for lab in np.unique(labels)[1:]:
     
     area = np.full(labels.shape[0], np.nan)
     roundness = np.full(labels.shape[0], np.nan)
+    intensity = np.full(labels.shape[0], np.nan)
     
     for t in range(labels.shape[0]):
         labs = labels[t, ...]
         
-        for prop in regionprops(labs):
+        for prop in regionprops(labs, intensity_image=C2_proj[t,...]):
             if prop.label == lab:
                 
-                # Area & roundness
+                # Area, intensity & roundness
                 area[t] = prop.area
                 roundness[t] = 4 * np.pi * prop.area / (prop.perimeter ** 2)
-                                
+                intensity[t] = np.sum(prop.image_intensity)
+                
                 # Draw object squares
                 idx = np.where(labs == lab)
                 x0, y0 = np.min(idx[0]), np.min(idx[1])
                 x1, y1 = np.max(idx[0]), np.max(idx[1])
                 rr, cc = rectangle_perimeter(
                     (x0, y0), (x1, y1), shape=display[t, ...].shape)
-                display[t, rr, cc] = 4
+                display[t, rr, cc] = 255
                                 
                 # Draw object texts
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 cv2.putText(
                     display[t,...], f"{lab:02d}", 
                     (y0 - 18, x0 + 6), # depend on resolution
-                    font, 0.33, 4, 1, cv2.LINE_AA
+                    font, 0.33, 255, 1, cv2.LINE_AA
                     ) 
                 cv2.putText(
                     display[t,...], f"{area[t]:.0f}", 
                     (y0 - 2, x0 - 6), # depend on resolution
-                    font, 0.33, 1, 1, cv2.LINE_AA
+                    font, 0.33, 64, 1, cv2.LINE_AA
                     ) 
                 cv2.putText(
                     display[t,...], f"{roundness[t]:.2f}", 
                     (y0 - 2, x0 - 18), # depend on resolution
-                    font, 0.33, 1, 1, cv2.LINE_AA
+                    font, 0.33, 64, 1, cv2.LINE_AA
+                    ) 
+                cv2.putText(
+                    display[t,...], f"{int(intensity[t])}", 
+                    (y0 - 2, x0 - 30), # depend on resolution
+                    font, 0.33, 64, 1, cv2.LINE_AA
                     ) 
                 
-    objects.append({"area" : area, "roundness" : roundness})
+    objects.append({"area" : area, "roundness" : roundness, "intensity" : intensity})
 
-# -----------------------------------------------------------------------------
+skelOut = gaussian(skelOut, sigma=(0, 1, 1))
 
-# Display
+#%% Display -------------------------------------------------------------------
+
 viewer = napari.Viewer()
-viewer.add_image(C1_proj, blending="additive", opacity=0.75)
-viewer.add_image(maskAll, blending="additive", colormap="yellow", opacity=0.1, visible=False)
-viewer.add_image(maskOut, blending="additive", colormap="bop blue", opacity=0.33, visible=False)
-viewer.add_image(maskBod, blending="additive", colormap="bop orange", opacity=0.33, visible=False)
-viewer.add_image(skelOut, blending="additive", opacity=0.5)
+viewer.add_image(C1_proj, blending="additive", opacity=0.5)
+viewer.add_image(C2_proj, blending="additive", colormap="yellow")
+viewer.add_image(skelOut, blending="additive", colormap="bop blue", opacity=0.5)
 viewer.add_image(display, blending="additive")
-viewer.add_labels(labels, )
+viewer.add_labels(labels, visible=False)
 
-#%%
+#%% Save ----------------------------------------------------------------------
 
-# viewer = napari.Viewer()
-# viewer.add_image(C1_proj, opacity=0.33)
-# viewer.add_image(display, blending="additive")
-# viewer.add_image(outl, blending="additive")
-# viewer.add_labels(labels)
+io.imsave(
+    Path(local_path, Path(local_path, f"{exp_name}_{exp_numb}_labels.tif")),
+    labels.astype("uint8"), check_contrast=False,
+    )
+io.imsave(
+    Path(local_path, Path(local_path, f"{exp_name}_{exp_numb}_display.tif")),
+    display.astype("uint8"), check_contrast=False,
+    )
+
+# area = np.stack([data["area"] for data in objects], axis=1)
+# roundness = np.stack([data["roundness"] for data in objects], axis=1)
+# intensity = np.stack([data["intensity"] for data in objects], axis=1)

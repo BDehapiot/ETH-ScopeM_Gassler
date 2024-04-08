@@ -18,9 +18,9 @@ from skimage.transform import downscale_local_mean
 #%% Inputs --------------------------------------------------------------------
 
 # Path
-loc_path  = Path("D:/local_Gassler/data")
-net_path  = Path(r"\\scopem-userdata.ethz.ch\Image-Clinic\20240131_Burst_Rate_24TG02")
-nd2_paths = list(net_path.glob("**/*.nd2"))
+local_path = Path("D:/local_Gassler/data")
+remote_path = Path(r"\\scopem-userdata.ethz.ch\Image-Clinic\20240131_Burst_Rate_24TG02")
+nd2_paths = list(remote_path.glob("**/*.nd2"))
 nd2_paths[0:2] = [] # Remove merged .nd2 files
 
 # Stems
@@ -37,9 +37,9 @@ downscale_factor = 4
 for stem in stems:
     
     exp_name, exp_numb = stem.split("_")
-    paths = list(net_path.glob(f"**/{exp_name}_{exp_numb}.nd2"))
-    C1_path = Path(loc_path, f"C1_{exp_name}_{exp_numb}.tif")
-    C2_path = Path(loc_path, f"C2_{exp_name}_{exp_numb}.tif")
+    paths = list(remote_path.glob(f"**/{exp_name}_{exp_numb}.nd2"))
+    C1_path = Path(local_path, f"{exp_name}_{exp_numb}_C1.tif")
+    C2_path = Path(local_path, f"{exp_name}_{exp_numb}_C2.tif")
     
     if not C1_path.exists():
     
