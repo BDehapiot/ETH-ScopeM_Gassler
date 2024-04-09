@@ -1,10 +1,19 @@
 #%% Imports -------------------------------------------------------------------
 
+import cv2
 import numpy as np
+from pathlib import Path
+import segmentation_models as sm
 from joblib import Parallel, delayed 
 from scipy.ndimage import distance_transform_edt
+
+# Skimage
+from skimage.filters import gaussian
+from skimage.draw import rectangle_perimeter
+from skimage.segmentation import clear_border
+from skimage.measure import label, regionprops
 from skimage.morphology import (
-    disk, binary_erosion, binary_dilation
+    disk, binary_erosion, binary_dilation, skeletonize, remove_small_objects
     )
 
 #%% Functions -----------------------------------------------------------------
@@ -33,8 +42,8 @@ def get_all(msk):
     
     labels = np.unique(msk)[1:]
     edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
-    for l, label in enumerate(labels):
-        tmp = msk == label
+    for l, lab in enumerate(labels):
+        tmp = msk == lab
         tmp = distance_transform_edt(tmp)
         pMax = np.percentile(tmp[tmp > 0], 99.9)
         tmp[tmp > pMax] = pMax
@@ -44,12 +53,14 @@ def get_all(msk):
     
     return edm
 
+# -----------------------------------------------------------------------------
+
 def get_outlines(msk):
     
     labels = np.unique(msk)[1:]
     edm = np.zeros((labels.shape[0], msk.shape[0], msk.shape[1]))
-    for l, label in enumerate(labels):
-        tmp = msk == label
+    for l, lab in enumerate(labels):
+        tmp = msk == lab
         tmp = tmp ^ binary_erosion(tmp)
         tmp = binary_dilation(tmp, footprint=disk(3))
         tmp = distance_transform_edt(tmp)
@@ -147,4 +158,166 @@ def merge_patches(patches, shape, size, overlap):
         arr = np.stack(arr)
         
     return arr
+
+# -----------------------------------------------------------------------------
+
+def predict(C1_proj, size, overlap):
+    
+    # Define model
+    model = sm.Unet(
+        'resnet34', 
+        input_shape=(None, None, 1), 
+        classes=1, 
+        activation='sigmoid', 
+        encoder_weights=None,
+        )
+    
+    # Get patches
+    patches = get_patches(C1_proj, size, overlap)
+    patches = np.stack(patches)
+    
+    # Load weights & predict
+    model.load_weights(Path(Path.cwd(), "model_weights_all.h5")) 
+    predAll = model.predict(patches).squeeze()
+    model.load_weights(Path(Path.cwd(), "model_weights_outlines.h5")) 
+    predOut = model.predict(patches).squeeze()
+    model.load_weights(Path(Path.cwd(), "model_weights_bodies.h5")) 
+    predBod = model.predict(patches).squeeze()
+    
+    # Merge patches
+    predAll = merge_patches(predAll, C1_proj.shape, size, overlap)
+    predOut = merge_patches(predOut, C1_proj.shape, size, overlap)
+    predBod = merge_patches(predBod, C1_proj.shape, size, overlap)
+    
+    return predAll, predOut, predBod
+
+# -----------------------------------------------------------------------------
+
+def process(
+        C1_proj, C2_proj,
+        predAll, predOut, predBod,
+        threshAll, threshOut, threshBod,
+        min_size, min_roundness
+        ):
+    
+    # Get mask ----------------------------------------------------------------
+    
+    maskAll = gaussian(predAll, sigma=(0, 1, 1)) > threshAll # Parameter !!!
+    maskOut = gaussian(predOut, sigma=(0, 1, 1)) > threshOut # Parameter !!!
+    maskBod = gaussian(predBod, sigma=(0, 1, 1)) > threshBod # Parameter !!!
+    
+    # Process masks
+    mask = []
+    for t in range(C1_proj.shape[0]):
+        
+        mAll = maskAll[t, ...].copy()
+        mOut = maskOut[t, ...]
+        mBod = maskBod[t, ...]
+        
+        # Separate touching objects
+        skel = skeletonize(mOut, method="lee")
+        mAll[skel == 255] = 0
+        mAll = remove_small_objects(mAll, min_size=min_size, connectivity=1)
+        
+        # Filter masks 
+        for prop in regionprops(label(mAll, connectivity=1)):
+            idx = (prop.coords[:, 0], prop.coords[:, 1])
+            roundness = 4 * np.pi * prop.area / (prop.perimeter ** 2)
+
+            # Based on roundness
+            if roundness < min_roundness:
+                mAll[idx] = False
+            
+            # Not connected to body
+            if not np.max(mBod[idx]): 
+                mAll[idx] = False     
+        
+        # Append
+        mask.append(mAll)  
+    mask = np.stack(mask)
+        
+    # Get labels --------------------------------------------------------------
+
+    labels = []
+    labels.append(label(mask[0, ...], connectivity=1))
+    for t in range(1, mask.shape[0]):
+        
+        labs = label(mask[t, ...], connectivity=1)
+        
+        # Track objects
+        for prop in regionprops(labs) :
+            idx = (prop.coords[:, 0], prop.coords[:, 1])
+            val1 = labels[t-1][idx]
+            val2 = val1[val1 != 0]
+            val3, counts = np.unique(val2, return_counts=True)
+            if val2.size > val1.size * 0.25: # Parameter !!!
+                mode = val3[np.argmax(counts)]
+            else:
+                mode = 0
+            labs[idx] = mode
+            
+        # Append
+        labels.append(labs)
+    labels = np.stack(labels)
+
+    # Get data ----------------------------------------------------------------
+
+    data = []
+    display = np.zeros_like(labels)
+    for lab in np.unique(labels)[1:]:
+        
+        area = np.full(labels.shape[0], np.nan)
+        roundness = np.full(labels.shape[0], np.nan)
+        intensity = np.full(labels.shape[0], np.nan)
+        
+        for t in range(labels.shape[0]):
+            labs = labels[t, ...]
+            
+            for prop in regionprops(labs, intensity_image=C2_proj[t,...]):
+                if prop.label == lab:
+                    
+                    # Area, intensity & roundness
+                    area[t] = prop.area
+                    roundness[t] = 4 * np.pi * prop.area / (prop.perimeter ** 2)
+                    intensity[t] = np.sum(prop.image_intensity)
+                    
+                    # Draw object squares
+                    idx = np.where(labs == lab)
+                    x0, y0 = np.min(idx[0]), np.min(idx[1])
+                    x1, y1 = np.max(idx[0]), np.max(idx[1])
+                    rr, cc = rectangle_perimeter(
+                        (x0, y0), (x1, y1), shape=display[t, ...].shape)
+                    display[t, rr, cc] = 255
+                                    
+                    # Draw object texts
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    cv2.putText(
+                        display[t,...], f"{lab:02d}", 
+                        (y0 - 18, x0 + 6), # depend on resolution !!!
+                        font, 0.33, 255, 1, cv2.LINE_AA
+                        ) 
+                    cv2.putText(
+                        display[t,...], f"{area[t]:.0f}", 
+                        (y0 - 2, x0 - 6), # depend on resolution !!!
+                        font, 0.33, 64, 1, cv2.LINE_AA
+                        ) 
+                    cv2.putText(
+                        display[t,...], f"{roundness[t]:.2f}", 
+                        (y0 - 2, x0 - 18), # depend on resolution !!!
+                        font, 0.33, 64, 1, cv2.LINE_AA
+                        ) 
+                    cv2.putText(
+                        display[t,...], f"{int(intensity[t])}", 
+                        (y0 - 2, x0 - 30), # depend on resolution !!!
+                        font, 0.33, 64, 1, cv2.LINE_AA
+                        ) 
+        
+        # Append
+        data.append({
+            "area" : area, 
+            "roundness" : roundness, 
+            "intensity" : intensity
+            })
+    
+    return mask, labels, display, data 
  

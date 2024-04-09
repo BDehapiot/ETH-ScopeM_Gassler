@@ -10,6 +10,7 @@ dependencies:
   - scipy
   - pandas
   - scikit-image
+  - opencv
   - scikit-learn
   - joblib
   - matplotlib-base

@@ -1,32 +1,20 @@
 #%% Imports -------------------------------------------------------------------
 
-import cv2
 import time
+import pickle
 import napari
 import numpy as np
 from skimage import io
 from pathlib import Path
-import segmentation_models as sm
-
-# Skimage
-from skimage.filters import gaussian
-from skimage.draw import rectangle_perimeter
-from skimage.segmentation import clear_border
-from skimage.measure import label, regionprops
-from skimage.morphology import skeletonize, remove_small_objects
 
 # Functions
-from functions import preprocess, get_patches, merge_patches
-
+from functions import preprocess, predict, process
+    
 #%% Inputs --------------------------------------------------------------------
 
 # Paths
 local_path = Path("D:/local_Gassler/data")
-data_path = Path(Path.cwd(), "data")
-model_all_path = Path(Path.cwd(), "model_weights_all.h5")
-model_outlines_path = Path(Path.cwd(), "model_weights_outlines.h5")
-model_bodies_path = Path(Path.cwd(), "model_weights_bodies.h5")
-exp_name, exp_numb = "R11", "003"
+exp_name, exp_numb = "R20", "001"
 
 # Patches
 downscale_factor = 4
@@ -34,11 +22,11 @@ size = 512 // downscale_factor
 overlap = size // 2
 
 # Parameters
-sigma = (0, 1, 1) #
 threshAll = 0.05 #
 threshOut = 0.25 #
 threshBod = 0.05 #
 min_size = 32 # 
+min_roundness = 0.5 #
 
 #%% Preprocessing -------------------------------------------------------------
 
@@ -46,178 +34,37 @@ C1 = io.imread(Path(local_path, f"{exp_name}_{exp_numb}_C1.tif"))
 C2 = io.imread(Path(local_path, f"{exp_name}_{exp_numb}_C2.tif"))
 C1_proj = preprocess(C1)
 C2_proj = np.sum(C2, axis=1)
-patches = get_patches(C1_proj, size, overlap)
-patches = np.stack(patches)
 
-#%% Predict -------------------------------------------------------------------
+#%% Execute -------------------------------------------------------------------
 
-# Define & compile model
-model = sm.Unet(
-    'resnet34', 
-    input_shape=(None, None, 1), 
-    classes=1, 
-    activation='sigmoid', 
-    encoder_weights=None,
-    )
-
-# Load weights & predict
-model.load_weights(model_all_path) 
-predAll = model.predict(patches).squeeze()
-model.load_weights(model_outlines_path) 
-predOut = model.predict(patches).squeeze()
-model.load_weights(model_bodies_path) 
-predBod = model.predict(patches).squeeze()
-
-# Merge patches
-print("Merge patches :", end='')
 t0 = time.time()
-predAll = merge_patches(predAll, C1_proj.shape, size, overlap)
-predOut = merge_patches(predOut, C1_proj.shape, size, overlap)
-predBod = merge_patches(predBod, C1_proj.shape, size, overlap)
+predAll, predOut, predBod = predict(
+    C1_proj, size, overlap
+    )
 t1 = time.time()
-print(f" {(t1-t0):<5.2f}s") 
+print(f"Predict : {(t1-t0):<.2f}s")
 
-# # Display
-# viewer = napari.Viewer()
-# viewer.add_image(C1_proj, blending="additive", opacity=0.33) 
-# viewer.add_image(predAll, blending="additive", colormap="bop blue") 
-# viewer.add_image(predOut, blending="additive", colormap="bop orange") 
-# viewer.add_image(predBod, blending="additive", colormap="bop purple") 
-
-#%% Process -------------------------------------------------------------------
-
-# Get masks
-maskAll = gaussian(predAll, sigma=sigma) > threshAll
-maskOut = gaussian(predOut, sigma=sigma) > threshOut
-maskBod = gaussian(predBod, sigma=sigma) > threshBod
-
-# Process masks
-pMaskAll, skelOut = [], []
-for t in range(C1_proj.shape[0]):
-    
-    mAll = maskAll[t, ...].copy()
-    mOut = maskOut[t, ...]
-    mBod = maskBod[t, ...]
-    
-    # Separate touching objects
-    skel = skeletonize(mOut, method="lee")
-    mAll[skel == 255] = 0
-    mAll = remove_small_objects(mAll, min_size=min_size, connectivity=1)
-    
-    # Filter masks 
-    for prop in regionprops(label(mAll, connectivity=1)):
-        idx = (prop.coords[:, 0], prop.coords[:, 1])
-        roundness = 4 * np.pi * prop.area / (prop.perimeter ** 2)
-
-        # Based on roundness
-        if roundness < 0.5: # Parameter !!!
-            mAll[idx] = False
-        
-        # Not connected to body
-        if not np.max(mBod[idx]): 
-            mAll[idx] = False     
-    
-    # Append
-    pMaskAll.append(mAll)  
-    skelOut.append(skel)
-    
-pMaskAll = np.stack(pMaskAll)
-skelOut = np.stack(skelOut)
-
-# -----------------------------------------------------------------------------
-
-# Get labels
-labels = []
-labels.append(label(pMaskAll[0, ...], connectivity=1))
-for t in range(1, pMaskAll.shape[0]):
-    
-    labs = label(pMaskAll[t, ...], connectivity=1)
-    med = np.median(np.stack(labels), axis=0)
-    props = regionprops(labs)    
-    
-    # Track objects
-    for prop in props:
-        idx = (prop.coords[:, 0], prop.coords[:, 1])
-        val1 = labels[t-1][idx]
-        val2 = val1[val1 != 0]
-        val3, counts = np.unique(val2, return_counts=True)
-        if val2.size > val1.size * 0.25: # Parameter !!!
-            mode = val3[np.argmax(counts)]
-        else:
-            mode = 0
-        labs[idx] = mode
-    labels.append(labs)
-    
-labels = np.stack(labels)
-
-# -----------------------------------------------------------------------------
-
-# Get objects + display
-objects = []
-display = np.zeros_like(labels)
-for lab in np.unique(labels)[1:]:
-    
-    area = np.full(labels.shape[0], np.nan)
-    roundness = np.full(labels.shape[0], np.nan)
-    intensity = np.full(labels.shape[0], np.nan)
-    
-    for t in range(labels.shape[0]):
-        labs = labels[t, ...]
-        
-        for prop in regionprops(labs, intensity_image=C2_proj[t,...]):
-            if prop.label == lab:
-                
-                # Area, intensity & roundness
-                area[t] = prop.area
-                roundness[t] = 4 * np.pi * prop.area / (prop.perimeter ** 2)
-                intensity[t] = np.sum(prop.image_intensity)
-                
-                # Draw object squares
-                idx = np.where(labs == lab)
-                x0, y0 = np.min(idx[0]), np.min(idx[1])
-                x1, y1 = np.max(idx[0]), np.max(idx[1])
-                rr, cc = rectangle_perimeter(
-                    (x0, y0), (x1, y1), shape=display[t, ...].shape)
-                display[t, rr, cc] = 255
-                                
-                # Draw object texts
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                cv2.putText(
-                    display[t,...], f"{lab:02d}", 
-                    (y0 - 18, x0 + 6), # depend on resolution
-                    font, 0.33, 255, 1, cv2.LINE_AA
-                    ) 
-                cv2.putText(
-                    display[t,...], f"{area[t]:.0f}", 
-                    (y0 - 2, x0 - 6), # depend on resolution
-                    font, 0.33, 64, 1, cv2.LINE_AA
-                    ) 
-                cv2.putText(
-                    display[t,...], f"{roundness[t]:.2f}", 
-                    (y0 - 2, x0 - 18), # depend on resolution
-                    font, 0.33, 64, 1, cv2.LINE_AA
-                    ) 
-                cv2.putText(
-                    display[t,...], f"{int(intensity[t])}", 
-                    (y0 - 2, x0 - 30), # depend on resolution
-                    font, 0.33, 64, 1, cv2.LINE_AA
-                    ) 
-                
-    objects.append({"area" : area, "roundness" : roundness, "intensity" : intensity})
-
-skelOut = gaussian(skelOut, sigma=(0, 1, 1))
+t0 = time.time()
+mask, labels, display, data = process(
+    C1_proj, C2_proj,
+    predAll, predOut, predBod,
+    threshAll, threshOut, threshBod,
+    min_size, min_roundness
+    )
+t1 = time.time()
+print(f"Process : {(t1-t0):<.2f}s")
 
 #%% Display -------------------------------------------------------------------
 
 viewer = napari.Viewer()
 viewer.add_image(C1_proj, blending="additive", opacity=0.5)
 viewer.add_image(C2_proj, blending="additive", colormap="yellow")
-viewer.add_image(skelOut, blending="additive", colormap="bop blue", opacity=0.5)
 viewer.add_image(display, blending="additive")
 viewer.add_labels(labels, visible=False)
 
 #%% Save ----------------------------------------------------------------------
 
+# Images
 io.imsave(
     Path(local_path, Path(local_path, f"{exp_name}_{exp_numb}_labels.tif")),
     labels.astype("uint8"), check_contrast=False,
@@ -227,6 +74,38 @@ io.imsave(
     display.astype("uint8"), check_contrast=False,
     )
 
-# area = np.stack([data["area"] for data in objects], axis=1)
-# roundness = np.stack([data["roundness"] for data in objects], axis=1)
-# intensity = np.stack([data["intensity"] for data in objects], axis=1)
+# Data
+with open(Path(local_path, f"{exp_name}_{exp_numb}_data.pkl"), 'wb') as file:
+    pickle.dump(data, file)
+    
+#%% Plot ----------------------------------------------------------------------
+
+import matplotlib.pyplot as plt
+
+# -----------------------------------------------------------------------------
+
+plt.figure(figsize=(6, 12))
+
+plt.subplot(3, 1, 1)
+for d in data:
+    plt.plot(d["area"])
+plt.title('Areas')
+plt.xlabel('Index')
+plt.ylabel('Area')
+
+plt.subplot(3, 1, 2)
+for d in data:
+    plt.plot(d["roundness"])
+plt.title('Roundness')
+plt.xlabel('Index')
+plt.ylabel('Roundness')
+
+plt.subplot(3, 1, 3)
+for d in data:
+    plt.plot(d["intensity"])
+plt.title('Intensities')
+plt.xlabel('Index')
+plt.ylabel('Intensity')
+
+plt.tight_layout()
+plt.show()
