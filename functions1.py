@@ -262,46 +262,27 @@ def process(
         # Append
         labels.append(labs)
     labels = np.stack(labels)
-    
-    # Update mask
-    mask = labels > 0
-    
-    # Get skel_labels 
-    skel = np.zeros_like(mask)
-    for t in range(labels.shape[0]):
-        skel[t, ...] = skeletonize(binary_erosion(mask[t, ...]))
-    skel_labels = labels.copy()
-    skel_labels[skel == 0] = 0
 
     # Get data ----------------------------------------------------------------
 
     data = []
     display = np.zeros_like(labels)
     for lab in np.unique(labels)[1:]:
+        
         area = np.full(labels.shape[0], np.nan)
-        length = np.full(labels.shape[0], np.nan)
         roundness = np.full(labels.shape[0], np.nan)
         intensity = np.full(labels.shape[0], np.nan)
         
         for t in range(labels.shape[0]):
-            labs = labels[t, ...]     
-            skel_labs = skel_labels[t, ...]
+            labs = labels[t, ...]
             
-            for prop1 in regionprops(labs, intensity_image=C2_proj[t,...]):
-                if prop1.label == lab:
+            for prop in regionprops(labs, intensity_image=C2_proj[t,...]):
+                if prop.label == lab:
                     
                     # Area, intensity & roundness
-                    area[t] = prop1.area
-                    roundness[t] = 4 * np.pi * prop1.area / (prop1.perimeter ** 2)
-                    intensity[t] = np.sum(prop1.image_intensity)
-                    
-                    # Length
-                    tmp_length = 0
-                    tmp_lab = label(skel_labs == lab, connectivity=1)
-                    for prop2 in regionprops(tmp_lab):
-                        tmp_length += prop2.area - 1
-                    tmp_length += (np.max(tmp_lab) - 1) * np.sqrt(2)
-                    length[t] = tmp_length
+                    area[t] = prop.area
+                    roundness[t] = 4 * np.pi * prop.area / (prop.perimeter ** 2)
+                    intensity[t] = np.sum(prop.image_intensity)
                     
                     # Draw object squares
                     idx = np.where(labs == lab)
@@ -337,9 +318,8 @@ def process(
         # Append
         data.append({
             "area" : area, 
-            "length" : length,
             "roundness" : roundness, 
-            "intensity" : intensity,
+            "intensity" : intensity
             })
     
     return mask, labels, display, data 

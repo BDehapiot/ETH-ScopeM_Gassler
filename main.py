@@ -14,7 +14,7 @@ from functions import preprocess, predict, process
 
 # Paths
 local_path = Path("D:/local_Gassler/data")
-exp_name, exp_numb = "R20", "001"
+exp_name, exp_numb = "IND", "002"
 
 # Patches
 downscale_factor = 4
@@ -26,7 +26,7 @@ threshAll = 0.05 #
 threshOut = 0.25 #
 threshBod = 0.05 #
 min_size = 32 # 
-min_roundness = 0.5 #
+min_roundness = 0.3 #
 
 #%% Preprocessing -------------------------------------------------------------
 
@@ -86,21 +86,28 @@ import matplotlib.pyplot as plt
 
 plt.figure(figsize=(6, 12))
 
-plt.subplot(3, 1, 1)
+plt.subplot(4, 1, 1)
 for d in data:
     plt.plot(d["area"])
 plt.title('Areas')
 plt.xlabel('Index')
 plt.ylabel('Area')
 
-plt.subplot(3, 1, 2)
+plt.subplot(4, 1, 2)
+for d in data:
+    plt.plot(d["length"])
+plt.title('length')
+plt.xlabel('Index')
+plt.ylabel('length')
+
+plt.subplot(4, 1, 3)
 for d in data:
     plt.plot(d["roundness"])
 plt.title('Roundness')
 plt.xlabel('Index')
 plt.ylabel('Roundness')
 
-plt.subplot(3, 1, 3)
+plt.subplot(4, 1, 4)
 for d in data:
     plt.plot(d["intensity"])
 plt.title('Intensities')
@@ -109,3 +116,30 @@ plt.ylabel('Intensity')
 
 plt.tight_layout()
 plt.show()
+
+#%% Tests ---------------------------------------------------------------------
+
+#%%
+
+# from skimage.measure import label, regionprops
+# from bdtools.skel import pixconn
+
+# # -----------------------------------------------------------------------------
+
+# arr = np.array(
+#     [[0, 1, 0, 0, 0, 0],
+#      [0, 1, 0, 0, 1, 0],
+#      [0, 1, 0, 1, 0, 0],
+#      [0, 0, 1, 0, 0, 0],
+#      [0, 0, 1, 1, 0, 0],
+#      [0, 1, 0, 1, 0, 0]])
+
+# length = 0
+# lab = label(arr, connectivity=1)
+# props = regionprops(lab)
+# for prop in props:
+#     length += prop.area - 1
+# length += (np.max(lab) - 1) * np.sqrt(2)
+
+
+

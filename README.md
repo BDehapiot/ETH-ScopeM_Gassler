@@ -3,7 +3,9 @@ Analysis of fungi spore germination
 
 ## Comments
 - Features to be added :  
-    - Requirement for more complex tracking algorithm?
-    - Best focus for DIC?
-    - Retreive pixel size from ND2 and integrate it into the saved TIF 
-    - Remove border touching objects
+
+    - Measure object elongation (done, basically opposite of roundness)
+    - Remove early touching objects
+    - Remove border touching objects (done)
+    - Area/intensity ratio
+    - Output CSV
