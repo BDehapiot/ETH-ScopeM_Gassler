@@ -277,6 +277,7 @@ def process(
 
     data = []
     display = np.zeros_like(labels)
+    display += skel * 96 # Draw object skeleton
     for lab in np.unique(labels)[1:]:
         area = np.full(labels.shape[0], np.nan)
         length = np.full(labels.shape[0], np.nan)
@@ -310,7 +311,7 @@ def process(
                     rr, cc = rectangle_perimeter(
                         (x0, y0), (x1, y1), shape=display[t, ...].shape)
                     display[t, rr, cc] = 255
-                                    
+                                                        
                     # Draw object texts
                     font = cv2.FONT_HERSHEY_SIMPLEX
                     cv2.putText(
@@ -336,11 +337,12 @@ def process(
         
         # Append
         data.append({
+            "label" : lab,
             "area" : area, 
             "length" : length,
             "roundness" : roundness, 
             "intensity" : intensity,
             })
     
-    return mask, labels, display, data 
+    return mask, labels, skel, display, data 
  

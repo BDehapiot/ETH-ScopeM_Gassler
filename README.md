@@ -3,9 +3,15 @@ Analysis of fungi spore germination
 
 ## Comments
 - Features to be added :  
-
-    - Measure object elongation (done, basically opposite of roundness)
-    - Remove early touching objects
+    - Measure object elongation (done)
+    - Remove early touching objects (to do)
     - Remove border touching objects (done)
-    - Area/intensity ratio
-    - Output CSV
+    - Output CSV (almost done)
+
+- Exploring data
+    - Exploring data (add object ID on outputs & plots)
+    - Save high resolution plots in JPG
+
+- Post-analysis
+    - Remove object from the analysis (manually)
+
