@@ -1,17 +1,17 @@
 # ETH-ScopeM_Gassler
 Analysis of fungi spore germination
 
-## Comments
-- Features to be added :  
+## To do list
+- Segmentation
     - Measure object elongation (done)
     - Remove early touching objects (to do)
     - Remove border touching objects (done)
-    - Output CSV (almost done)
 
-- Exploring data
-    - Exploring data (add object ID on outputs & plots)
-    - Save high resolution plots in JPG
+- Results
+    - Output CSV (almost done)
+    - Object ID outputs & plots (to do)
+    - High resolution plots in JPG (to do)
 
 - Post-analysis
-    - Remove object from the analysis (manually)
+    - Manually reject objects from analysis (to do)
 

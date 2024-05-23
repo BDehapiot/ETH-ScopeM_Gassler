@@ -14,10 +14,10 @@ from functions import preprocess, predict, process
 #%% Inputs --------------------------------------------------------------------
 
 # Paths
-exp_name = "IND_003"
-measures = ["area", "length", "roundness", "intensity"]
-local_path = Path("D:/local_Gassler/data")
-save_path = Path(local_path, exp_name)
+exp_name = "pdINDw_20240131_tg_001"
+remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
+data_path = Path(remote_path, "data")
+save_path = Path(data_path, exp_name)
 save_path.mkdir(exist_ok=True)
 
 # Patches
@@ -26,18 +26,17 @@ size = 512 // downscale_factor
 overlap = size // 2
 
 # Parameters
+measures = ["area", "length", "roundness", "intensity"]
 threshAll = 0.05 #
 threshOut = 0.25 #
 threshBod = 0.05 #
 min_size = 32 # 
 min_roundness = 0.3 #
 
-print("hello")
-
 #%% Preprocessing -------------------------------------------------------------
 
-C1 = io.imread(Path(local_path, f"{exp_name}_C1.tif"))
-C2 = io.imread(Path(local_path, f"{exp_name}_C2.tif"))
+C1 = io.imread(Path(data_path, f"{exp_name}_C1.tif"))
+C2 = io.imread(Path(data_path, f"{exp_name}_C2.tif"))
 C1_proj = preprocess(C1)
 C2_proj = np.sum(C2, axis=1)
 
@@ -60,17 +59,33 @@ mask, labels, skel, display, data = process(
 t1 = time.time()
 print(f"Process : {(t1-t0):<.2f}s")
 
+#%% Plot ----------------------------------------------------------------------
+
+fig = plt.figure(figsize=(8, 16))
+for m, measure in enumerate(measures):
+    plt.subplot(len(measures), 1, m + 1)
+    label = np.arange(1, len(measures) + 1)
+    for d, dat in enumerate(data):
+        plt.plot(dat[f"{measure}"], label=d + 1)
+        if m == 0: fig.legend()
+    plt.title(f"{measure}")
+    plt.ylabel(f"{measure}")
+    plt.xlabel("timepoint")    
+    
+plt.tight_layout()
+plt.show()
+
 #%% Save ----------------------------------------------------------------------
 
 # Images
-# io.imsave(
-#     Path(save_path, f"{exp_name}_C1_proj.tif"),
-#     labels.astype("float32"), check_contrast=False,
-#     )
-# io.imsave(
-#     Path(save_path, f"{exp_name}_C2_proj.tif"),
-#     labels.astype("uint16"), check_contrast=False,
-#     )
+io.imsave(
+    Path(save_path, f"{exp_name}_C1_proj.tif"),
+    C1_proj.astype("float32"), check_contrast=False,
+    )
+io.imsave(
+    Path(save_path, f"{exp_name}_C2_proj.tif"),
+    C2_proj.astype("uint16"), check_contrast=False,
+    )
 io.imsave(
     Path(save_path, f"{exp_name}_labels.tif"),
     labels.astype("uint8"), check_contrast=False,
@@ -88,30 +103,20 @@ with open(Path(save_path, f"{exp_name}_data.pkl"), 'wb') as file:
 for measure in measures:
     np.savetxt(
         Path(save_path, f"{exp_name}_{measure}.csv"),
-        np.stack([d[f"{measure}"] for d in data], axis=1), 
+        np.stack([dat[f"{measure}"] for dat in data], axis=1), 
         delimiter=",", fmt="%.3f",
         )
 
-#%% Plot ----------------------------------------------------------------------
-
-plt.figure(figsize=(6, 12))
-
-for i, measure in enumerate(measures):
-    plt.subplot(len(measures), 1, i + 1)
-    for d in data:
-        plt.plot(d[f"{measure}"])
-    plt.title(f"{measure}")
-    plt.xlabel("index")
-    plt.ylabel(f"{measure}")
-
-plt.tight_layout()
-plt.show()
+# Data as JPG (plot)
+plt.savefig(Path(save_path, f"{exp_name}_plot.jpg"), format='jpg')
 
 #%% Display -------------------------------------------------------------------
 
-viewer = napari.Viewer()
-viewer.add_image(C1_proj, blending="additive", opacity=0.5)
-viewer.add_image(C2_proj, blending="additive", colormap="yellow")
-viewer.add_image(display, blending="additive")
-viewer.add_labels(labels, visible=False)
-
+# viewer = napari.Viewer()
+# viewer.add_labels(labels, visible=False)
+# viewer.add_image(predAll, blending="additive", colormap="magenta", visible=False)
+# viewer.add_image(predOut, blending="additive", colormap="magenta", visible=False)
+# viewer.add_image(predBod, blending="additive", colormap="magenta", visible=False)
+# viewer.add_image(C1_proj, blending="additive", opacity=0.5)
+# viewer.add_image(C2_proj, blending="additive", colormap="yellow")
+# viewer.add_image(display, blending="additive")
