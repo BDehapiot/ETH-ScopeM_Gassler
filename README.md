@@ -2,6 +2,14 @@
 Analysis of fungi spore germination
 
 ## Comments
+
+### To be fixed
+
+- Channel #2 should be save in 16bits (0 - 4096)
+- Channel #2 needs background normalization (divided by mean and subtract 1)
+
+--
+
 - Bleaching for channel #2
     - pdR05H_20240403_tg_003 
 - Unstable field of view

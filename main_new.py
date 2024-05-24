@@ -14,7 +14,7 @@ from functions import preprocess, predict, process
 #%% Inputs --------------------------------------------------------------------
 
 # Paths
-exp_name = "pdR05H_20240403_tg_003"
+exp_name = "pdR10H_20240403_tg_002"
 remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
 data_path = Path(remote_path, "data")
 save_path = Path(data_path, exp_name)
