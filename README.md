@@ -8,9 +8,9 @@ Analysis of fungi spore germination
     - Remove border touching objects (done)
 
 - Results
-    - Output CSV (almost done)
-    - Object ID outputs & plots (to do)
-    - High resolution plots in JPG (to do)
+    - Output CSV (done)
+    - Object ID outputs & plots (done)
+    - Save plots as JPG (done)
 
 - Post-analysis
     - Manually reject objects from analysis (to do)

@@ -70,9 +70,9 @@ for m, measure in enumerate(measures):
         if m == 0: fig.legend()
     plt.title(f"{measure}")
     plt.ylabel(f"{measure}")
-    plt.xlabel("timepoint")    
-    
+    plt.xlabel("timepoint")      
 plt.tight_layout()
+plt.savefig(Path(save_path, f"{exp_name}_plot.jpg"), format='jpg')
 plt.show()
 
 #%% Save ----------------------------------------------------------------------
@@ -95,20 +95,36 @@ io.imsave(
     display.astype("uint8"), check_contrast=False,
     )
 
+# Composite
+composite = np.concatenate((
+    np.expand_dims(C1_proj, axis=1),
+    np.expand_dims(C2_proj, axis=1),
+    ), axis=1)
+
+io.imsave(
+    Path(save_path, f"{exp_name}_composite.tif"),
+    composite.astype("float32"),
+    check_contrast=False,
+    imagej=True,
+    metadata={
+        'axes': 'TCYX', 
+        'mode': 'composite',
+        # 'LUTs': [lut_magenta, lut_green, lut_gray],
+        }
+    )
+
 # Data as PKL
 with open(Path(save_path, f"{exp_name}_data.pkl"), 'wb') as file:
     pickle.dump(data, file)
 
 # Data as CSV
 for measure in measures:
+    headers = ','.join(f"{i+1}" for i in range(len(data)))
     np.savetxt(
         Path(save_path, f"{exp_name}_{measure}.csv"),
         np.stack([dat[f"{measure}"] for dat in data], axis=1), 
-        delimiter=",", fmt="%.3f",
+        delimiter=",", fmt="%.3f", header=headers, comments='',
         )
-
-# Data as JPG (plot)
-plt.savefig(Path(save_path, f"{exp_name}_plot.jpg"), format='jpg')
 
 #%% Display -------------------------------------------------------------------
 
