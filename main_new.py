@@ -14,7 +14,7 @@ from functions import preprocess, predict, process
 #%% Inputs --------------------------------------------------------------------
 
 # Paths
-exp_name = "pdINDw_20240131_tg_001"
+exp_name = "pdR05H_20240403_tg_003"
 remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
 data_path = Path(remote_path, "data")
 save_path = Path(data_path, exp_name)
@@ -97,19 +97,25 @@ io.imsave(
 
 # Composite
 composite = np.concatenate((
-    np.expand_dims(C1_proj, axis=1),
-    np.expand_dims(C2_proj, axis=1),
+    np.expand_dims(C1_proj / np.max(C1_proj) * 128, axis=1),
+    np.expand_dims(C2_proj / np.max(C2_proj) * 255, axis=1),
+    np.expand_dims(display, axis=1),
     ), axis=1)
+
+val_range = np.arange(256, dtype='uint8')
+lut_gray = np.stack([val_range, val_range, val_range])
+lut_yellow = np.zeros((3, 256), dtype='uint8')
+lut_yellow[[0, 1], :] = np.arange(256, dtype='uint8')
 
 io.imsave(
     Path(save_path, f"{exp_name}_composite.tif"),
-    composite.astype("float32"),
+    composite.astype("uint8"),
     check_contrast=False,
     imagej=True,
     metadata={
         'axes': 'TCYX', 
         'mode': 'composite',
-        # 'LUTs': [lut_magenta, lut_green, lut_gray],
+        'LUTs': [lut_gray, lut_yellow, lut_gray],
         }
     )
 
@@ -128,11 +134,11 @@ for measure in measures:
 
 #%% Display -------------------------------------------------------------------
 
-# viewer = napari.Viewer()
-# viewer.add_labels(labels, visible=False)
-# viewer.add_image(predAll, blending="additive", colormap="magenta", visible=False)
-# viewer.add_image(predOut, blending="additive", colormap="magenta", visible=False)
-# viewer.add_image(predBod, blending="additive", colormap="magenta", visible=False)
-# viewer.add_image(C1_proj, blending="additive", opacity=0.5)
-# viewer.add_image(C2_proj, blending="additive", colormap="yellow")
-# viewer.add_image(display, blending="additive")
+viewer = napari.Viewer()
+viewer.add_labels(labels, visible=False)
+viewer.add_image(predAll, blending="additive", colormap="magenta", visible=False)
+viewer.add_image(predOut, blending="additive", colormap="magenta", visible=False)
+viewer.add_image(predBod, blending="additive", colormap="magenta", visible=False)
+viewer.add_image(C1_proj, blending="additive", opacity=0.5)
+viewer.add_image(C2_proj, blending="additive", colormap="yellow")
+viewer.add_image(display, blending="additive")

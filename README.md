@@ -1,6 +1,18 @@
 # ETH-ScopeM_Gassler
 Analysis of fungi spore germination
 
+## Comments
+- Bleaching for channel #2
+    - pdR05H_20240403_tg_003 
+- Unstable field of view
+    - expl : 
+- Bubbles & weird issues
+    - pdR10H_20240403_tg_001
+    - pdR10H_20240403_tg_003
+- predBod issues
+    - pdR10H_20240403_tg_002
+    - pdR20H_20240403_tg_003
+
 ## To do list
 - Segmentation
     - Measure object elongation (done)
