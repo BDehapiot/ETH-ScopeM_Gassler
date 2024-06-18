@@ -5,8 +5,12 @@ Analysis of fungi spore germination
 
 ### To be fixed
 
+Done (but need to be carefully checked)
 - Channel #2 should be save in 16bits (0 - 4096)
-- Channel #2 needs background normalization (divided by mean and subtract 1)
+- Channel #2 needs background subtraction
+
+Not done
+- Data from `20240613_tg_24TG10_Medium` cannot be preextracted
 
 --
 

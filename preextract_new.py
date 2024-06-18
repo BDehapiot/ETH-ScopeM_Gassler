@@ -19,6 +19,7 @@ remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
 data_path = Path(remote_path, "data")
 exclude = [
     "20240327_tg_INDxRpxMr-MinimalMedium",
+    "stock",
     ]
 
 # Parameter(s)
@@ -106,8 +107,8 @@ for i, path in enumerate(metadata["path"]):
                     C2, (1, 1, downscale_factor, downscale_factor))
                 
             # Normalize data
-            C1 = (C1 // 16).astype("uint8") # since max. int. = 4096
-            C2 = (C2 // 16).astype("uint8") # since max. int. = 4096
+            # C1 = (C1 // 16).astype("uint8") # since max. int. = 4096
+            # C2 = (C2 // 16).astype("uint8") # since max. int. = 4096
 
             t1 = time.time()
             print(f" {(t1-t0):<5.2f}s")
@@ -118,7 +119,7 @@ for i, path in enumerate(metadata["path"]):
             t0 = time.time()
         
             io.imsave(
-                C1_path, C1, check_contrast=False,
+                C1_path, C1.astype("uint16"), check_contrast=False,
                 imagej=True,
                 metadata={'axes': 'TZYX'},
                 photometric='minisblack',
@@ -126,7 +127,7 @@ for i, path in enumerate(metadata["path"]):
                 )
         
             io.imsave(
-                C2_path, C2, check_contrast=False,
+                C2_path, C2.astype("uint16"), check_contrast=False,
                 imagej=True,
                 metadata={'axes': 'TZYX'},
                 photometric='minisblack',
