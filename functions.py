@@ -299,7 +299,8 @@ def process(
     # Get data ----------------------------------------------------------------
     
     # Subtract C2_proj background
-    C2_proj = subtract_background(C2_proj, predAll)
+    if np.isnan(C2_proj).any():
+        C2_proj = subtract_background(C2_proj, predAll)
 
     data = []
     display = np.zeros_like(labels)
