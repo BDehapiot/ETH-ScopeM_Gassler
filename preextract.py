@@ -10,86 +10,132 @@ from skimage.transform import downscale_local_mean
 
 #%% Comments ------------------------------------------------------------------
 
-'''
-- format TZCYX
-
-'''
+# Stack format is TZCYX
 
 #%% Inputs --------------------------------------------------------------------
 
-# Path
-local_path = Path("D:/local_Gassler/data")
-remote_path = Path(r"\\scopem-userdata.ethz.ch\Image-Clinic\20240131_Burst_Rate_24TG02")
-nd2_paths = list(remote_path.glob("**/*.nd2"))
-nd2_paths[0:2] = [] # Remove merged .nd2 files
+# Paths
+remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
+data_path = Path(remote_path, "data")
+exclude = [
+    "20240327_tg_INDxRpxMr-MinimalMedium",
+    "stock",
+    ]
 
-# Stems
-stems = []
-for path in nd2_paths:
-    stems.append(path.stem)
-stems = sorted(set(stems))
+# Parameter(s)
+target_pixel_size = 0.433333333333332 
 
-# Parameters
-downscale_factor = 4
+#%% Initialize ----------------------------------------------------------------
+
+metadata = {
+    "path" : [], "cond" : [], "date" : [], "oprt" : [], "numb" : []
+    }
+
+for path in list(remote_path.glob("**/*.nd2")):
+    if not any(substring in str(path) for substring in exclude):
+        cond, date, oprt, numb = path.stem.split("_")
+        metadata["path"].append(path)
+        metadata["cond"].append(cond)
+        metadata["date"].append(date)
+        metadata["oprt"].append(oprt)
+        metadata["numb"].append(numb)
 
 #%% Extract stacks ------------------------------------------------------------
 
-for stem in stems:
+for i, path in enumerate(metadata["path"]):
     
-    exp_name, exp_numb = stem.split("_")
-    paths = list(remote_path.glob(f"**/{exp_name}_{exp_numb}.nd2"))
-    C1_path = Path(local_path, f"{exp_name}_{exp_numb}_C1.tif")
-    C2_path = Path(local_path, f"{exp_name}_{exp_numb}_C2.tif")
+    # Check paths
+    if "a.nd2" in path.name:
+        path_b = path.with_name(path.name.replace("a.nd2", "b.nd2"))
+        C1_path = Path(data_path, path.name.replace("a.nd2", "_C1.tif"))
+        C2_path = Path(data_path, path.name.replace("a.nd2", "_C2.tif"))
+    else:
+        path_b = None
+        C1_path = Path(data_path, path.name.replace(".nd2", "_C1.tif"))
+        C2_path = Path(data_path, path.name.replace(".nd2", "_C2.tif"))
     
     if not C1_path.exists():
-    
-        C1, C2 = [], []
-        for path in paths:
-
+        
+        if "b.nd2" not in path.name:
+        
+            # Open ------------------------------------------------------------    
+        
+            print(path.name)
+            print("Open :", end='')
+            t0 = time.time()
+                  
             with nd2.ND2File(path) as ndfile:
-        
-                print(f"Open - {path.parent.name}/{path.name} :", end='')
-                t0 = time.time()
                 
+                # Read metadata
+                nT, nZ, nC, nY, nX = ndfile.shape
+                pixel_size = ndfile.voxel_size()[0]
+                downscale_factor = int(target_pixel_size // pixel_size)
+                
+                # Open data
                 tmp = ndfile.asarray()
-                tmpC1, tmpC2 = tmp[:,:,0,:,:], tmp[:,:,1,:,:]
-                tmpC1 = downscale_local_mean(
-                    tmpC1, (1, 1, downscale_factor, downscale_factor))
-                tmpC2 = downscale_local_mean(
-                    tmpC2, (1, 1, downscale_factor, downscale_factor))
-                tmpC1 = (tmpC1 // 16).astype("uint8") # since max. int. = 4096
-                tmpC2 = (tmpC2 // 16).astype("uint8") # since max. int. = 4096
-                C1.append(tmpC1); C2.append(tmpC2)
+                C1, C2 = tmp[:,:,0,:,:], tmp[:,:,1,:,:]
                 
-                del tmp, tmpC1, tmpC2
+            if path_b is not None:
+                                
+                with nd2.ND2File(path_b) as ndfile:
+                    
+                    # Open data
+                    tmp_b = ndfile.asarray()
+                    C1_b, C2_b = tmp_b[:,:,0,:,:], tmp_b[:,:,1,:,:]
                 
-                t1 = time.time()
-                print(f" {(t1-t0):<5.2f}s")     
+                # Concatenate data
+                C1 = np.concatenate((C1, C1_b), axis=0)
+                C2 = np.concatenate((C2, C2_b), axis=0)
                 
-        C1 = np.concatenate(C1, axis=0)
-        C2 = np.concatenate(C2, axis=0)
+                del tmp_b
+            
+            del tmp
+            
+            t1 = time.time()
+            print(f" {(t1-t0):<5.2f}s")
+            
+            # Format ----------------------------------------------------------
+
+            print("Format :", end='')
+            t0 = time.time()
+
+            # Downscale data
+            if downscale_factor > 1:
+                C1 = downscale_local_mean(
+                    C1, (1, 1, downscale_factor, downscale_factor))
+                C2 = downscale_local_mean(
+                    C2, (1, 1, downscale_factor, downscale_factor))
+                
+            # Normalize data
+            # C1 = (C1 // 16).astype("uint8") # since max. int. = 4096
+            # C2 = (C2 // 16).astype("uint8") # since max. int. = 4096
+
+            t1 = time.time()
+            print(f" {(t1-t0):<5.2f}s")
+            
+            # Save ------------------------------------------------------------
     
-        print("Save :", end='')
-        t0 = time.time()
-    
-        io.imsave(
-            C1_path, C1, check_contrast=False,
-            imagej=True,
-            metadata={'axes': 'TZYX'},
-            photometric='minisblack',
-            planarconfig='contig',
-            )
-    
-        io.imsave(
-            C2_path, C2, check_contrast=False,
-            imagej=True,
-            metadata={'axes': 'TZYX'},
-            photometric='minisblack',
-            planarconfig='contig',
-            )
-    
-        t1 = time.time()
-        print(f" {(t1-t0):<5.2f}s")
+            print("Save :", end='')
+            t0 = time.time()
         
-        del C1, C2
-        gc.collect()                
+            io.imsave(
+                C1_path, C1.astype("uint16"), check_contrast=False,
+                imagej=True,
+                metadata={'axes': 'TZYX'},
+                photometric='minisblack',
+                planarconfig='contig',
+                )
+        
+            io.imsave(
+                C2_path, C2.astype("uint16"), check_contrast=False,
+                imagej=True,
+                metadata={'axes': 'TZYX'},
+                photometric='minisblack',
+                planarconfig='contig',
+                )
+            
+            del C1, C2
+            gc.collect()  
+        
+            t1 = time.time()
+            print(f" {(t1-t0):<5.2f}s")

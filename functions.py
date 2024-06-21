@@ -68,8 +68,9 @@ def subtract_background(arr, pred):
     arr_bg = arr.copy().astype("float32")
     arr_bg[mask == True] = np.nan
     arr_bg = np.nanmean(arr_bg, axis=0)
-    arr_bg = nanreplace(
-        arr_bg, kernel_size=27, filt_method='median', parallel=False) # Parameter
+    if np.isnan(arr_bg).any():
+        arr_bg = nanreplace(
+            arr_bg, kernel_size=27, filt_method='median', parallel=False) # Parameter
     arr_bg = gaussian(arr_bg, sigma=5) # Parameter
     arr_bgsub = arr.astype("float32") - arr_bg
     
@@ -299,8 +300,7 @@ def process(
     # Get data ----------------------------------------------------------------
     
     # Subtract C2_proj background
-    if np.isnan(C2_proj).any():
-        C2_proj = subtract_background(C2_proj, predAll)
+    C2_proj = subtract_background(C2_proj, predAll)
 
     data = []
     display = np.zeros_like(labels)
@@ -494,20 +494,22 @@ def batch(
     
     # Plot -------------------------------------------------------------------- 
     
-    if iPlot:
+    fig = plt.figure(figsize=(8, 16))
+    for m, measure in enumerate(measures):
+        plt.subplot(len(measures), 1, m + 1)
+        for d, dat in enumerate(data):
+            plt.plot(dat[f"{measure}"], label=d + 1)
+            if m == 0: fig.legend()
+        plt.title(f"{measure}")
+        plt.ylabel(f"{measure}")
+        plt.xlabel("timepoint")      
+    plt.tight_layout()
+    plt.savefig(Path(save_path, f"{exp_name}_plot.jpg"), format='jpg')
     
-        fig = plt.figure(figsize=(8, 16))
-        for m, measure in enumerate(measures):
-            plt.subplot(len(measures), 1, m + 1)
-            for d, dat in enumerate(data):
-                plt.plot(dat[f"{measure}"], label=d + 1)
-                if m == 0: fig.legend()
-            plt.title(f"{measure}")
-            plt.ylabel(f"{measure}")
-            plt.xlabel("timepoint")      
-        plt.tight_layout()
-        plt.savefig(Path(save_path, f"{exp_name}_plot.jpg"), format='jpg')
+    if iPlot:
         plt.show()
+    else:
+        plt.close(fig)
     
     # Display -----------------------------------------------------------------
  
