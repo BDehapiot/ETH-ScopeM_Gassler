@@ -3,23 +3,35 @@
 ### `preextract.py`
 Read data from `remote_path`, format and save to `data_path`
 
+- Paths
+```bash
+- remote_path     # str, path to remote directory
+- data_path       # str, path to saving directory
+- exclude         # list[str], exclude path(s) containing any of the str
+```
+
 - Parameters
 ```bash
-- exclude             # PKL file containing all data 
-- target_pixel_size   # Tracked objects areas
+- pixSize_out     # float, output pixel size (µm) 
 ```
 
 ### `main.py`
 Read data from `data_path` and execute the [main procedure](#main-procedure)
 
+- Paths
+```bash
+- remote_path     # str, path to remote directory
+- data_path       # str, path to data directory
+- target          # str, "all" or "image_name"
+- overwrite       # bool, overwrite outputs
+```
 - Parameters
 ```bash
-- target              # "all"  = all dat
-- threshAll           # PKL file containing all data 
-- threshOut           # Tracked objects areas
-- threshBod           # Tracked objects C2 intensities 
-- min_size            # Tracked objects length  
-- min_roundness       # Tracked objects roundness
+- threshAll       # float, threshold for "all" predictions
+- threshOut       # float, threshold for "outlines" predictions
+- threshBod       # float, threshold for "bodies" predictions
+- min_size        # int, min. size for tracked objects
+- min_roundness   # float, min. roundness for tracked objects
 ```
 
 ## Main procedure
@@ -28,19 +40,19 @@ Read data from `data_path` and execute the [main procedure](#main-procedure)
 
 ### Images
 ```bash
-- C1_proj.tif     # Channel 1 (spores) std-projection
-- C2_proj.tif     # Channel 2 (bacteria) sum-projection
-- display.tif     # Tracked objects display
-- labels.tif      # Tracked objects labels
+- C1_proj.tif     # channel 1 (spores) std-projection
+- C2_proj.tif     # channel 2 (bacteria) sum-projection
+- display.tif     # tracked objects display
+- labels.tif      # tracked objects labels
 - composite.tif   # C1_proj + C2_proj + display
 ```
 
 ### Data
 ```bash
 - data.pkl        # PKL file containing all data 
-- area.csv        # Tracked objects areas
-- intensity.csv   # Tracked objects C2 intensities 
-- length.csv      # Tracked objects length  
-- roundness.csv   # Tracked objects roundness
-- plot.jpg        # All data plot
+- area.csv        # tracked objects areas
+- intensity.csv   # tracked objects C2 intensities 
+- length.csv      # tracked objects length  
+- roundness.csv   # tracked objects roundness
+- plot.jpg        # all data plot
 ```

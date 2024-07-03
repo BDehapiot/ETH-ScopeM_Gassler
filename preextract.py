@@ -17,13 +17,13 @@ from skimage.transform import downscale_local_mean
 # Paths
 remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
 data_path = Path(remote_path, "data")
-
-# Parameter(s)
 exclude = [
     "20240327_tg_INDxRpxMr-MinimalMedium",
     "stock",
     ]
-target_pixel_size = 0.433333333333332 
+
+# Parameter(s)
+pixSize_out = 0.433333333333332 
 
 #%% Initialize ----------------------------------------------------------------
 
@@ -68,8 +68,8 @@ for i, path in enumerate(metadata["path"]):
                 
                 # Read metadata
                 nT, nZ, nC, nY, nX = ndfile.shape
-                pixel_size = ndfile.voxel_size()[0]
-                downscale_factor = int(target_pixel_size // pixel_size)
+                pixSize_in = ndfile.voxel_size()[0]
+                downscale_factor = int(pixSize_out // pixSize_in)
                 
                 # Open data
                 tmp = ndfile.asarray()
