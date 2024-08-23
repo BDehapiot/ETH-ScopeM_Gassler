@@ -7,7 +7,7 @@ import pickle
 import numpy as np
 from skimage import io
 from pathlib import Path
-from nan import nanreplace
+from bdtools.nan import nanreplace
 import matplotlib.pyplot as plt
 import segmentation_models as sm
 from joblib import Parallel, delayed 

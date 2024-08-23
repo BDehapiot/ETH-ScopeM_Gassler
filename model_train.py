@@ -3,6 +3,7 @@
 import napari
 import random
 import numpy as np
+import pandas as pd
 from skimage import io
 from pathlib import Path
 import albumentations as A
@@ -186,3 +187,9 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 plt.show()
+
+# Save training history data
+train_data = pd.DataFrame(history.history)
+train_data = train_data.round(5)
+train_data.index.name = 'Epoch'
+train_data.to_csv(f"model_weights_{mask_type}.csv")

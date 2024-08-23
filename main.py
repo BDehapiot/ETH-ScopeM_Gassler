@@ -8,10 +8,11 @@ from functions import batch
 #%% Inputs --------------------------------------------------------------------
 
 # Paths
-remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
+# remote_path = Path(r"\\scopem-idadata.ethz.ch\BDehapiot\remote_Gassler")
+remote_path = Path("D:\local_Gassler")
 data_path = Path(remote_path, "data")
-target = "all" 
-# target = "pdINDw_20240131_tg_001"
+# target = "all" 
+target = "pdINDw_20240131_tg_001"
 overwrite = False
    
 # Parameters
