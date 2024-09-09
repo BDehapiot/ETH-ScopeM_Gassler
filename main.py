@@ -12,8 +12,9 @@ from functions import batch
 remote_path = Path("D:\local_Gassler")
 data_path = Path(remote_path, "data")
 # target = "all" 
-target = "pdINDw_20240131_tg_001"
-overwrite = False
+# target = "pdINDw_20240131_tg_001"
+target = "mmR20n_20240613_tg_008"
+overwrite = True
    
 # Parameters
 threshAll = 0.05 #
