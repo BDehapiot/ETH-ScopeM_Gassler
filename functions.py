@@ -451,6 +451,19 @@ def batch(
         display.astype("uint8"), check_contrast=False,
         )
 
+    io.imsave(
+        Path(save_path, f"{exp_name}_predAll.tif"),
+        predAll.astype("float32"), check_contrast=False,
+        )
+    io.imsave(
+        Path(save_path, f"{exp_name}_predOut.tif"),
+        predOut.astype("float32"), check_contrast=False,
+        )
+    io.imsave(
+        Path(save_path, f"{exp_name}_predBod.tif"),
+        predBod.astype("float32"), check_contrast=False,
+        )
+
     # Composite
     composite = np.concatenate((
         np.expand_dims(C1_proj / np.max(C1_proj) * 128, axis=1),
