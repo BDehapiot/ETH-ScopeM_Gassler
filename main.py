@@ -12,7 +12,7 @@ from functions import batch
 remote_path = Path("D:\local_Gassler")
 data_path = Path(remote_path, "data")
 # target = "all" 
-target = "pdINDw_20240131_tg_005"
+target = "pdINDw_20240604_tg_012"
 # target = "mmR20n_20240613_tg_008"
 overwrite = True
    

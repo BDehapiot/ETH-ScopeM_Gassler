@@ -36,6 +36,8 @@ Read data from `data_path` and execute the [main procedure](#main-procedure)
 
 ## Main procedure
 
+<img src='procedure.png' width="560" alt="procedure">
+
 ## Outputs
 
 ### Images
