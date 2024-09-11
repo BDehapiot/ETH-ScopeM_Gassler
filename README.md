@@ -123,7 +123,7 @@ Read data from `data_path` and execute the [main procedure](#main-procedure)
 
 ## Main procedure
 
-<img src='utils/procedure.png' width="560" alt="procedure">
+<img src='utils/procedure.png' width="840" alt="procedure">
 
 ## Outputs
 
