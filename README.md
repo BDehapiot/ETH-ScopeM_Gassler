@@ -14,7 +14,6 @@ Spore germination analysis tool
 - [Usage](#usage)
 - [Main procedure](#main-procedure)
 - [Outputs](#outputs)
-- [Comments](#comments)
 
 ## Installation
 
@@ -147,16 +146,3 @@ Read data from `data_path` and execute the [main procedure](#main-procedure)
 - plot.jpg        # all data plot
 ```
 
-## Comments
-
-- Features
-    - Done
-        - Background subtraction for channel #2
-        - Measure object elongation
-        - Remove border touching objects
-        - Output CSV
-        - Save plots as JPG
-        - Object ID outputs & plots
-    - To do
-        - Remove early touching objects
-        - Manually reject objects from analysis
